@@ -1,0 +1,39 @@
+/* supplemental styles: process page, detail blocks */
+.detail-block { margin-top: 1.4rem; }
+.detail-label {
+  font-size: 0.7rem; font-weight: 620; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 0.3rem;
+}
+
+/* vertical step blocks get their number in one column */
+.step-blocks { max-width: 900px; }
+
+/* services page: number the split sections with big serif numerals overlapping */
+.band .split .kicker::before { background: var(--gold); }
+
+/* contact page form */
+.contact-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(2.5rem, 6vw, 5rem); align-items: start; }
+.c-form { display: grid; gap: 1.15rem; }
+.c-field label {
+  display: block; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--ink-2); margin-bottom: 0.4rem;
+}
+.c-field input, .c-field select, .c-field textarea {
+  width: 100%; font-family: var(--sans); font-size: 1rem; color: var(--ink);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 0.78rem 0.95rem; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.c-field textarea { min-height: 130px; resize: vertical; }
+.c-field input:focus, .c-field select:focus, .c-field textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.14);
+}
+.c-form .btn-accent { justify-self: start; margin-top: 0.4rem; }
+.c-note { font-size: 0.84rem; color: var(--ink-3); }
+.c-facts { border-top: 1px solid var(--line); }
+.c-facts > div { display: grid; grid-template-columns: 130px 1fr; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+.c-facts dt { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); padding-top: 0.2rem; }
+.c-facts dd { font-size: 0.98rem; color: var(--ink-2); }
+@media (max-width: 860px) {
+  .contact-grid { grid-template-columns: 1fr; }
+  .c-facts > div { grid-template-columns: 110px 1fr; }
+}

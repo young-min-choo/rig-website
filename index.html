@@ -10,10 +10,10 @@
   <meta property="og:image" content="assets/img/hero.jpg">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B1D33'/%3E%3Ctext x='32' y='42' font-family='Georgia,serif' font-size='28' font-weight='700' fill='%232DD4BF' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e7c66'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-size='30' fill='%23fafaf7' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"Organization","name":"Regenesis International Group","alternateName":"RIG","url":"https://young-min-choo.github.io/rig-website/"}
@@ -24,92 +24,127 @@
 
   <header class="site-header">
     <nav class="container" aria-label="Main navigation">
-      <a class="brand" href="#top">
+      <a class="brand" href="index.html">
         <span class="brand-mark" aria-hidden="true">R</span>
-        <span class="brand-text">RIG<em>Regenesis International Group</em></span>
+        <span class="brand-text"><b>RIG</b><span>Regenesis International Group</span></span>
       </a>
-      <ul class="nav-menu" id="nav-menu">
-        <li><a href="#about">About</a></li>
-        <li><a href="#services">Services</a></li>
-        <li><a href="#network">Network</a></li>
-        <li><a href="#team">Team</a></li>
-        <li><a class="nav-cta" href="#contact">Contact</a></li>
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
+      <label for="nav-toggle" class="burger" aria-label="Toggle menu"><span></span></label>
+      <ul class="nav-menu">
+        <li><a href="about.html">About</a></li>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="network.html">Network</a></li>
+        <li><a href="team.html">Team</a></li>
+        <li><a class="nav-cta" href="contact.html">Contact us</a></li>
       </ul>
     </nav>
   </header>
 
   <main id="main">
 
-    <!-- HERO -->
+    <!-- ============ HERO ============ -->
     <section class="hero">
       <div class="hero-media" aria-hidden="true">
         <img src="assets/img/hero.jpg" alt="" onerror="this.closest('.hero-media').classList.add('no-img')">
       </div>
       <div class="container hero-content">
-        <p class="eyebrow">Regenerative Medicine · International Liaison</p>
-        <h1>Connecting medical institutions and corporations&nbsp;across borders.</h1>
+        <p class="kicker">Regenerative Medicine · International Liaison</p>
+        <h1>Connecting medical institutions and corporations across&nbsp;borders.</h1>
         <p class="lede">Regenesis International Group (RIG) builds lasting bridges between hospitals, clinics, researchers and companies — from Japan to Southeast Asia and beyond.</p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="#contact">Get in touch</a>
-          <a class="btn btn-ghost" href="#services">What we do</a>
+          <a class="btn btn-accent" href="contact.html">Start a conversation</a>
+          <a class="btn btn-light" href="services.html">What we do</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><span class="stat-num">2&nbsp;hubs</span><span class="stat-label">Tokyo · Kuala Lumpur</span></div>
+          <div class="stat"><span class="stat-num">1&nbsp;corridor</span><span class="stat-label">Japan ⇄ Southeast Asia</span></div>
+          <div class="stat"><span class="stat-num">Growing</span><span class="stat-label">Hospital by hospital</span></div>
         </div>
       </div>
     </section>
 
-    <!-- ABOUT -->
-    <section id="about" class="section">
+    <!-- ============ INTRO ============ -->
+    <section id="about" class="band">
       <div class="container">
-        <p class="kicker">About RIG</p>
-        <h2>A trusted bridge in the regenerative medicine ecosystem</h2>
-        <div class="about-grid">
-          <p>Regenesis International Group is an international business development and liaison company. We connect medical institutions with corporations, research partners and service providers so that the right parties find each other — across languages, borders and regulatory environments.</p>
-          <p>Our focus is regenerative medicine: the hospitals, clinics, researchers and companies shaping the next generation of healthcare. We work quietly, precisely, and always in service of our partners' goals.</p>
-        </div>
-        <ul class="principles" role="list">
-          <li><strong>Networks over noise.</strong> Introductions only where they create real value.</li>
-          <li><strong>Cross-border by design.</strong> Japan–Southeast Asia is our home ground.</li>
-          <li><strong>Long-term trust.</strong> We measure success in partnerships that last.</li>
-        </ul>
+        <p class="kicker">Who we are</p>
+        <h2>A trusted bridge in the regenerative medicine&nbsp;ecosystem</h2>
+        <p class="lede">Regenesis International Group is an international business development and liaison company. We connect medical institutions with corporations, research partners and service providers so that the right parties find each other — across languages, borders and regulatory environments.</p>
+        <p>Our focus is regenerative medicine: the hospitals, clinics, researchers and companies shaping the next generation of healthcare.</p>
       </div>
     </section>
 
-    <!-- SERVICES -->
-    <section id="services" class="section section-alt">
+    <!-- ============ WHO WE SERVE ============ -->
+    <section id="serve" class="band band-tint">
       <div class="container">
-        <p class="kicker">What we do</p>
-        <h2>Services</h2>
-        <div class="card-grid">
-          <article class="card">
-            <p class="card-num" aria-hidden="true">01</p>
-            <h3>Institution Networking</h3>
-            <p>Connecting hospitals and clinics with vetted partners — from specialist providers to research institutions — matched to each partner's needs.</p>
+        <p class="kicker">Who we serve</p>
+        <h2>Two sides, one lasting bridge</h2>
+        <div class="tile-grid">
+          <article class="tile">
+            <h3>Hospitals &amp; clinics</h3>
+            <ul class="tile-list">
+              <li>International partnership discovery</li>
+              <li>Corporate &amp; research introductions</li>
+              <li>Cross-border program coordination</li>
+            </ul>
+            <p>Institutions offering world-class care who want the right international partners — without the noise.</p>
           </article>
-          <article class="card">
-            <p class="card-num" aria-hidden="true">02</p>
-            <h3>Regenerative Medicine Liaison</h3>
-            <p>Coordination across the stem cell and regenerative medicine ecosystem: institutions, suppliers and corporations, introduced with cultural and commercial fluency.</p>
+          <article class="tile">
+            <h3>Corporations</h3>
+            <ul class="tile-list">
+              <li>Healthcare market entry (Japan · SEA)</li>
+              <li>Vetted institution introductions</li>
+              <li>Regulatory-aware partnership structuring</li>
+            </ul>
+            <p>Companies entering the healthcare and biotechnology space who need trusted local counterparts.</p>
           </article>
-          <article class="card">
-            <p class="card-num" aria-hidden="true">03</p>
-            <h3>Corporate Partnerships</h3>
-            <p>For corporations entering the healthcare and biotechnology space internationally — opportunity scouting, partner introductions and relationship management.</p>
-          </article>
-          <article class="card">
-            <p class="card-num" aria-hidden="true">04</p>
-            <h3>Cross-Border Operations</h3>
-            <p>Practical Japan–Southeast Asia coordination: communication, scheduling, and navigation of local business practice on both sides.</p>
+          <article class="tile">
+            <h3>Researchers &amp; providers</h3>
+            <ul class="tile-list">
+              <li>Collaboration matchmaking</li>
+              <li>Clinic &amp; supplier liaison</li>
+              <li>Practical cross-border operations</li>
+            </ul>
+            <p>Stem cell and regenerative medicine specialists building across borders with cultural and commercial fluency.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- NETWORK -->
-    <section id="network" class="section">
+    <!-- ============ HOW IT WORKS (preview) ============ -->
+    <section id="process" class="band">
+      <div class="container">
+        <p class="kicker">How we work</p>
+        <h2>A clear path from first conversation to working&nbsp;partnership</h2>
+        <div class="steps">
+          <div class="step">
+            <span class="step-num num-serif">01</span>
+            <h3>Discovery</h3>
+            <p>We listen first — your goals, constraints, timelines — before any introduction is made.</p>
+          </div>
+          <div class="step">
+            <span class="step-num num-serif">02</span>
+            <h3>Matchmaking</h3>
+            <p>Introductions only where they create real value, vetted on both sides.</p>
+          </div>
+          <div class="step">
+            <span class="step-num num-serif">03</span>
+            <h3>Coordination</h3>
+            <p>Meetings, translation and scheduling across cultures and time zones.</p>
+          </div>
+          <div class="step">
+            <span class="step-num num-serif">04</span>
+            <h3>Growing</h3>
+            <p>Long-term relationship management — we measure success in partnerships that last.</p>
+          </div>
+        </div>
+        <p style="margin-top:2.2rem;"><a class="btn-link" href="process.html">Our full working process →</a></p>
+      </div>
+    </section>
+
+    <!-- ============ NETWORK ============ -->
+    <section id="network" class="band band-dark">
       <div class="container split">
-        <div class="split-media" aria-hidden="true">
-          <img src="assets/img/network.jpg" alt="" onerror="this.closest('.split-media').classList.add('no-img')">
-        </div>
-        <div>
+        <div class="split-text">
           <p class="kicker">Our network</p>
           <h2>Two hubs, one corridor</h2>
           <p>With roots in <strong>Tokyo</strong> and <strong>Kuala Lumpur</strong>, RIG operates along the Japan–Southeast Asia corridor — one of the fastest-growing regions for regenerative medicine and cross-border healthcare partnership.</p>
@@ -120,57 +155,65 @@
             <li>Southeast Asia</li>
             <li>International</li>
           </ul>
+          <p style="margin-top:1.8rem;"><a class="btn-link" href="network.html" style="color:#6fd0b8;border-bottom-color:rgba(111,208,184,0.4);">Explore the network →</a></p>
+        </div>
+        <div class="split-media" aria-hidden="true">
+          <img src="assets/img/network.jpg" alt="" onerror="this.closest('.split-media').classList.add('no-img')">
         </div>
       </div>
     </section>
 
-    <!-- TEAM -->
-    <section id="team" class="section section-alt">
+    <!-- ============ TEAM ============ -->
+    <section id="team" class="band">
       <div class="container">
         <p class="kicker">People</p>
-        <h2>Team</h2>
-        <p class="section-note">Photos arriving shortly — the site updates automatically once each member's photo is added.</p>
-        <div class="team-grid">
-          <!-- Photos: drop files into assets/team/ using these names and they appear automatically:
-               luqman.jpg · choo.jpg · shiv.jpg · lucas.jpg · aya.jpg   -->
+        <h2>A team built on trust</h2>
+        <p class="lede">Five people, one shared conviction: the right introduction, made with care, changes what becomes possible.</p>
+        <div class="team-grid" style="margin-top:2.6rem;">
+          <!-- Photos: drop files into assets/team/ using these names; they appear automatically.
+               luqman.jpg · choo.jpg · shiv.jpg · lucas.jpg · aya.jpg -->
           <article class="member">
-            <div class="avatar" data-initial="L"><img src="assets/team/luqman.jpg" alt="Portrait of Luqman" onerror="this.remove()"></div>
+            <div class="member-photo" data-initial="L"><img src="assets/team/luqman.jpg" alt="Portrait of Luqman" onerror="this.remove()"><span class="initials" aria-hidden="true">L</span></div>
             <h3>Luqman</h3>
             <p class="role">Founder</p>
           </article>
           <article class="member">
-            <div class="avatar" data-initial="YC"><img src="assets/team/choo.jpg" alt="Portrait of Young Min Choo" onerror="this.remove()"></div>
+            <div class="member-photo" data-initial="YC"><img src="assets/team/choo.jpg" alt="Portrait of Young Min Choo" onerror="this.remove()"><span class="initials" aria-hidden="true">YC</span></div>
             <h3>Young Min Choo</h3>
             <p class="role">Co-Founder</p>
           </article>
           <article class="member">
-            <div class="avatar" data-initial="S"><img src="assets/team/shiv.jpg" alt="Portrait of Shiv" onerror="this.remove()"></div>
+            <div class="member-photo" data-initial="S"><img src="assets/team/shiv.jpg" alt="Portrait of Shiv" onerror="this.remove()"><span class="initials" aria-hidden="true">S</span></div>
             <h3>Shiv</h3>
             <!-- TODO: confirm Shiv's title -->
             <p class="role">Team Member</p>
           </article>
           <article class="member">
-            <div class="avatar" data-initial="DL"><img src="assets/team/lucas.jpg" alt="Portrait of Dr Lucas" onerror="this.remove()"></div>
+            <div class="member-photo" data-initial="DL"><img src="assets/team/lucas.jpg" alt="Portrait of Dr Lucas" onerror="this.remove()"><span class="initials" aria-hidden="true">DL</span></div>
             <h3>Dr Lucas</h3>
             <!-- TODO: confirm Dr Lucas' title -->
             <p class="role">Medical Consultant</p>
           </article>
           <article class="member">
-            <div class="avatar" data-initial="A"><img src="assets/team/aya.jpg" alt="Portrait of Aya" onerror="this.remove()"></div>
+            <div class="member-photo" data-initial="A"><img src="assets/team/aya.jpg" alt="Portrait of Aya" onerror="this.remove()"><span class="initials" aria-hidden="true">A</span></div>
             <h3>Aya</h3>
             <p class="role">Hospital Relations</p>
           </article>
         </div>
+        <p class="section-note team-note">Team portraits are being added as members confirm them. <a href="team.html">Meet the team →</a></p>
       </div>
     </section>
 
-    <!-- CONTACT -->
-    <section id="contact" class="section contact">
+    <!-- ============ CONTACT ============ -->
+    <section id="contact" class="band band-dark contact-band">
       <div class="container">
         <p class="kicker">Contact</p>
         <h2>Let's build the connection.</h2>
         <p class="lede">Whether you represent a hospital, clinic, research institution or corporation, we'd welcome the conversation.</p>
-        <!-- TODO: set up a contact email once the company domain is registered (e.g. contact@regenesisinternationalgroup.com) -->
+        <div class="contact-actions">
+          <a class="btn btn-accent" href="contact.html">Get in touch</a>
+          <a class="btn btn-light" href="network.html">Our network</a>
+        </div>
         <ul class="chips" role="list">
           <li>Tokyo, Japan</li>
           <li>Kuala Lumpur, Malaysia</li>
@@ -181,9 +224,41 @@
 
   <footer class="site-footer">
     <div class="container">
-      <p class="footer-brand">Regenesis International Group</p>
-      <p class="footer-disclaimer">RIG provides business development and liaison services. We do not provide medical treatment, medical advice, or regulated medical services of any kind.</p>
-      <p class="footer-copy">© 2026 Regenesis International Group. All rights reserved.</p>
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true">R</span>
+            <b>Regenesis International Group</b>
+          </div>
+          <p class="footer-blurb">An international liaison company connecting medical institutions and corporations across Japan and Southeast Asia.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="about.html">About</a></li>
+            <li><a href="team.html">Team</a></li>
+            <li><a href="process.html">Our process</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Expertise</h4>
+          <ul>
+            <li><a href="services.html">Services</a></li>
+            <li><a href="network.html">Network</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Contact</h4>
+          <ul>
+            <li><a href="contact.html">Get in touch</a></li>
+            <li><p>Tokyo · Kuala Lumpur</p></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-legal">
+        <p>RIG provides business development and liaison services only. We do not provide medical treatment, medical advice, or regulated medical services of any kind. <a href="disclaimer.html">Read full disclaimer</a>.</p>
+        <p>© 2026 Regenesis International Group. All rights reserved.</p>
+      </div>
     </div>
   </footer>
 </body>

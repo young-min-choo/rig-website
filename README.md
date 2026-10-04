@@ -1,66 +1,36 @@
-# RIG — Regenesis International Group website
+# RIG — Regenesis International Group
 
-Public exposure site for Regenesis International Group (RIG): international
-business development & liaison in regenerative medicine, connecting medical
-institutions and corporations (Japan ↔ Southeast Asia corridor).
+Exposure site for a regenerative-medicine liaison company (Japan <-> Southeast Asia).
 
-- **Live URL:** https://young-min-choo.github.io/rig-website/
-- **Stack:** plain static HTML/CSS (no build step, no dependencies)
-- **Deadline context:** basic completion Oct 6, 2026; member photos by Oct 7
+**Live:** https://young-min-choo.github.io/rig-website/
 
-## Editing
+## Structure (v1.0)
 
-| What | Where |
+| Page | Purpose |
 |---|---|
-| Copy / sections / team roles | `index.html` (search `TODO:`) |
-| Styling | `assets/css/style.css` |
-| Images | `assets/img/` (regenerate: `python3 scripts/gen_images.py`) |
-| Team photos | `assets/team/` — drop in, they appear automatically |
+| `index.html` | Hero + stats, who we serve, process preview, network teaser, team, contact |
+| `about.html` | Story, 3 principles, stats band, what-we-are/are-not compliance split |
+| `services.html` | 4 numbered services with imagery + scope compliance split |
+| `process.html` | Full 4-stage working process with "you get" per stage |
+| `network.html` | Tokyo + KL hubs, coverage map in tiles |
+| `team.html` | 5 members; photos auto-swap when dropped into assets/team/ |
+| `contact.html` | Contact facts + form (wire Formspree action before launch) |
+| `disclaimer.html` | Full scope/compliance notice (Japan medical advertising caution) |
 
-## Team photos (due Oct 7)
+## Design system
+- Light "warm paper" palette (#fafaf7), deep viridian accent (#0e7c66), gold details
+- Instrument Serif display / Inter UI, one accent discipline
+- Sections alternate paper / mint / graphite bands; hairline dividers
+- Fully responsive (5-col team -> 3 -> 2), reduced-motion respected
 
-Drop each photo into `assets/team/` using exactly these filenames — the page
-picks them up with zero code changes (until then, initial-letter avatars show):
+## Team photos
+Drop `luqman.jpg`, `choo.jpg`, `shiv.jpg`, `lucas.jpg`, `aya.jpg` into `assets/team/`
+and they appear automatically (initial-letter placeholders until then).
 
-```
-choo.jpg    luqman.jpg    shiv.jpg    lucas.jpg    aya.jpg
-```
+## Before launch checklist
+- [ ] Wire contact form to a real endpoint (Formspree free tier works on GitHub Pages)
+- [ ] Confirm Shiv + Dr Lucas titles (TODO comments in team sections)
+- [ ] Contact email -> company-domain address when domain is registered
+- [ ] Team member photos arriving 10/7
 
-## Images
-
-`scripts/gen_images.py` regenerates the 4 site images (hero, network, cells,
-hospital) via pollinations.ai (Flux). Any image that 404s degrades gracefully to
-a CSS gradient — the site never looks broken without them.
-
-## Deploying
-
-The site is served by GitHub Pages from the `main` branch. Any push to `main`
-auto-deploys:
-
-```bash
-git add -A && git commit -m "..." && git push
-```
-
-## Content TODOs
-
-- [ ] Titles for Shiv and Dr Lucas (placeholders in place — confirm with Luqman)
-- [ ] Contact email (activate after domain registration)
-- [ ] Optional: real office addresses / phone
-
-## Domain (not yet registered — as of 2026-10-04)
-
-These were available at check time (verify again at purchase):
-
-- `regenesisinternationalgroup.com` ✅ available
-- `regenesisintl.com` ✅ available
-
-To attach after registering: repo → Settings → Pages → Custom domain, then
-commit the auto-created `CNAME` file.
-
-## Compliance note (keep)
-
-The footer disclaimer ("business development and liaison services; no medical
-treatment or advice") is deliberate — keep it on every version of the site.
-Japan's medical advertising rules (医療広告ガイドライン) and regenerative
-medicine regulations are strict about patient-facing claims; keep all copy
-B2B and non-therapeutic.
+Deploy: push to `main` -> GitHub Pages serves automatically.

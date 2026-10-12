@@ -20,6 +20,7 @@ Exposure site for a regenerative-medicine liaison company (Japan <-> Southeast A
 ## Design system
 - Light "warm paper" palette (#fafaf7), deep viridian accent (#0e7c66), gold details
 - Instrument Serif display / Inter UI, one accent discipline
+- Fonts self-hosted (`assets/fonts/`, OFL) via `assets/css/fonts.css` — no Google Fonts CDN, no third-party requests
 - Sections alternate paper / mint / graphite bands; hairline dividers
 - Fully responsive (5-col team -> 3 -> 2), reduced-motion respected
 

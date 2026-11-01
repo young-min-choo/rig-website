@@ -2,11 +2,11 @@
 
 Drop member photos here with exactly these filenames (the site auto-loads them):
 
-- `choo.jpg` — Young Min Choo
-- `luqman.jpg` — Luqman
-- `shiv.jpg` — Shiv
-- `lucas.jpg` — Dr Lucas
-- `aya.jpg` — Aya
+- `luqman.jpg` — Wan Luqman Hakim (Chief Executive Officer)
+- `choo.jpg` — Choo Young Min (Chief Technology Officer)
+- `shiv.jpg` — Shiv Nanda (Chief Operating Officer)
+- `lucas.jpg` — Dr. Lucas (Medical Advisor)
+- `aya.jpg` — Aya Ogawa (Head of Japan Operations)
 
-Squares crop best (the page renders them as circles). Recommended ≥ 500×500.
-Deadline: Oct 7, 2026.
+Portrait 4:5 crops best (rendered as tall frames). Recommended ≥ 800×1000.
+Initial-letter placeholders show until a file is present.

@@ -1,181 +1,123 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>About — Regenesis International Group</title>
-  <meta name="description" content="Regenesis International Group (RIG) is an international business development and liaison company focused on regenerative medicine, bridging Japan and Southeast Asia.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e7c66'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-size='30' fill='%23fafaf7' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
+  <meta name="description" content="Our mission, our story and the people behind Regenesis International Group.">
+  <meta property="og:title" content="About — Regenesis International Group">
+  <meta property="og:description" content="Our mission, our story and the people behind Regenesis International Group.">
+  <meta property="og:image" content="assets/img/hero.jpg">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0a0d14">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a0d14'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='34' fill='%23c8b27c' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/css/fonts.css">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body id="top">
+<body class="page">
   <a class="skip-link" href="#main">Skip to content</a>
-
   <header class="site-header">
-    <nav class="container" aria-label="Main navigation">
-      <a class="brand" href="index.html">
-        <span class="brand-mark" aria-hidden="true">R</span>
-        <span class="brand-text"><b>RIG</b><span>Regenesis International Group</span></span>
-      </a>
-      <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
-      <label for="nav-toggle" class="burger" aria-label="Toggle menu"><span></span></label>
+    <nav class="container" aria-label="Main">
+      <a class="wordmark" href="index.html" aria-label="Regenesis — home">REGENESIS</a>
+      <input type="checkbox" id="nav-toggle" class="nav-toggle">
+      <label for="nav-toggle" class="burger" aria-label="Menu"><span></span></label>
       <ul class="nav-menu">
+        <li><a href="index.html">Home</a></li>
         <li><a href="about.html" aria-current="page">About</a></li>
-        <li><a href="services.html">Services</a></li>
-        <li><a href="network.html">Network</a></li>
-        <li><a href="team.html">Team</a></li>
-        <li><a class="nav-cta" href="contact.html">Contact us</a></li>
+        <li><a href="partners.html">Partners</a></li>
+        <li><a class="nav-cta" href="index.html#enquire">Enquire</a></li>
+        <li class="lang" aria-label="Language">
+          <span aria-current="true" lang="en">EN</span><span class="sep" aria-hidden="true">|</span>
+          <!-- Chinese and Arabic editions follow professional translation (zh/, ar/ with dir="rtl"). -->
+          <span class="pending" lang="zh-Hans" title="Coming soon">中文</span><span class="sep" aria-hidden="true">|</span>
+          <span class="pending" lang="ar" dir="rtl" title="Coming soon">العربية</span>
+        </li>
       </ul>
     </nav>
   </header>
 
   <main id="main">
 
-    <!-- ============ PAGE HERO ============ -->
-    <section class="page-hero">
+    <section class="page-hero" aria-labelledby="mission-h">
+      <div class="hero-media" aria-hidden="true"><img src="assets/img/washi.jpg" alt=""></div>
       <div class="container">
-        <a class="back" href="index.html">← Back to home</a>
-        <p class="kicker">About RIG</p>
-        <h1>Networks over noise.</h1>
-        <p class="lede">Who we are, what we believe, and how we work — carefully, and for the long term.</p>
+        <p class="eyebrow">Our Mission</p>
+        <!-- COPY: brief read "Japan's finest medicine"; superlative softened. Pending Luqman's OK. -->
+        <h1 id="mission-h">To open the doors to Japanese medicine, for those who expect nothing less.</h1>
       </div>
     </section>
 
-    <!-- ============ STORY ============ -->
-    <section class="band">
-      <div class="container">
-        <div class="split">
-          <div class="split-text">
-            <p class="kicker">Our story</p>
-            <h2>Built on relationships that already&nbsp;exist</h2>
-            <p>RIG was founded on a simple observation: world-class medical institutions and ambitious companies are constantly looking for each other — but language, distance and unfamiliar business practice keep them apart.</p>
-            <p>We started with the relationships we already trusted: clinicians in Japan, partners in Malaysia and Southeast Asia, and corporations on both sides looking for a credible way in. Regenesis International Group formalized that network — and the quiet, personal way it works.</p>
-          </div>
-          <div class="split-media" aria-hidden="true">
-            <img src="assets/img/cells.jpg" alt="" onerror="this.closest('.split-media').classList.add('no-img')">
-          </div>
-        </div>
-        <div class="stats-light">
-          <div class="stat">
-            <span class="stat-num num-serif">2</span>
-            <span class="stat-label">Home bases — Tokyo &amp; Kuala Lumpur</span>
-          </div>
-          <div class="stat">
-            <span class="stat-num num-serif">JP–SEA</span>
-            <span class="stat-label">Our home corridor</span>
-          </div>
-          <div class="stat">
-            <span class="stat-num num-serif">1</span>
-            <span class="stat-label">Measure of success — partnerships that last</span>
+    <section class="band" aria-labelledby="story-h">
+      <div class="container split">
+        <div class="media-frame"><img src="assets/img/shoji.jpg" alt="Morning light in a quiet Japanese room" loading="lazy"></div>
+        <div>
+          <h2 id="story-h">Our Story</h2>
+          <div class="prose" style="margin-block-start:1.6rem">
+            <p>For generations, Japan has quietly set the world’s standard in precision, care and medical discipline. Yet for many international patients, its most advanced medicine has remained out of reach, hidden behind language, unfamiliar systems and uncertainty.</p>
+            <p>Regenesis was founded to change that. We bring a select few to the doors of Japan’s licensed clinics, with discretion, clarity and the personal attention our clients are accustomed to.</p>
+            <!-- COPY: brief read "the world's most trusted gateway"; superlative softened. Pending Luqman's OK. -->
+            <p>We begin with regenerative medicine. Our ambition is far greater: to become a trusted gateway to Japanese healthcare.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============ WHAT GUIDES US ============ -->
-    <section class="band band-tint">
+    <section class="band band-alt center" id="leadership" aria-labelledby="lead-h">
       <div class="container">
-        <p class="kicker">What guides us</p>
-        <h2>Three principles</h2>
-        <div class="tile-grid">
-          <article class="tile">
-            <h3>Networks over noise</h3>
-            <p>An introduction only where it creates real value. We would rather make ten careful introductions than a hundred careless ones.</p>
-          </article>
-          <article class="tile">
-            <h3>Cross-border by design</h3>
-            <p>Japan–Southeast Asia is our home ground. Language, culture, scheduling, expectations — we navigate both sides natively.</p>
-          </article>
-          <article class="tile">
-            <h3>Long-term trust</h3>
-            <p>We work quietly and precisely, in service of our partners' goals. We measure success in partnerships that last.</p>
-          </article>
-        </div>
+        <h2 id="lead-h">Leadership</h2>
+        <ul class="leaders">
+          <li class="leader">
+            <div class="leader-photo"><span class="initial" aria-hidden="true">W</span><img src="assets/team/luqman.jpg" alt="Wan Luqman Hakim" loading="lazy" onerror="this.remove()"></div>
+            <h3>Wan Luqman Hakim</h3>
+            <p class="title">Chief Executive Officer</p>
+          </li>
+          <li class="leader">
+            <div class="leader-photo"><span class="initial" aria-hidden="true">C</span><img src="assets/team/choo.jpg" alt="Choo Young Min" loading="lazy" onerror="this.remove()"></div>
+            <h3>Choo Young Min</h3>
+            <p class="title">Chief Technology Officer</p>
+          </li>
+          <li class="leader">
+            <div class="leader-photo"><span class="initial" aria-hidden="true">S</span><img src="assets/team/shiv.jpg" alt="Shiv Nanda" loading="lazy" onerror="this.remove()"></div>
+            <h3>Shiv Nanda</h3>
+            <p class="title">Chief Operating Officer</p>
+          </li>
+          <li class="leader">
+            <div class="leader-photo"><span class="initial" aria-hidden="true">L</span><img src="assets/team/lucas.jpg" alt="Dr. Lucas" loading="lazy" onerror="this.remove()"></div>
+            <h3>Dr. Lucas</h3>
+            <p class="title">Medical Advisor</p>
+          </li>
+          <li class="leader">
+            <div class="leader-photo"><span class="initial" aria-hidden="true">A</span><img src="assets/team/aya.jpg" alt="Aya Ogawa" loading="lazy" onerror="this.remove()"></div>
+            <h3>Aya Ogawa</h3>
+            <p class="title">Head of Japan Operations</p>
+          </li>
+        </ul>
       </div>
     </section>
 
-    <!-- ============ WHO WE ARE ============ -->
-    <section class="band">
-      <div class="container-narrow">
-        <p class="kicker">What we are — and are not</p>
-        <h2>Clarity about our role</h2>
-        <p class="lede" style="margin-bottom:1.6rem;">Regenesis International Group is a business development and liaison company. Being precise about what that means — and what it does not — is part of the trust we ask our partners to place in us.</p>
-        <div class="comp-grid">
-          <div class="comp-col we">
-            <h3>What we are</h3>
-            <ul class="comp-list">
-              <li>Business development and liaison professionals</li>
-              <li>Introducers and coordinators between institutions and companies</li>
-              <li>Cross-border communication and scheduling partners</li>
-              <li>Cultural and commercial interpreters on both sides</li>
-            </ul>
-          </div>
-          <div class="comp-col not">
-            <h3>What we are not</h3>
-            <ul class="comp-list">
-              <li>A hospital, clinic, or medical practice of any kind</li>
-              <li>A provider of medical treatment or medical advice</li>
-              <li>A party to clinical decisions — those remain with licensed professionals</li>
-              <li>A regulator, guarantor, or cell-processing facility</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ CTA ============ -->
-    <section class="band band-dark contact-band cta-band">
-      <div class="container">
-        <p class="kicker">Next step</p>
-        <h2>The right introduction changes what becomes&nbsp;possible.</h2>
-        <div class="contact-actions">
-          <a class="btn btn-accent" href="contact.html">Get in touch</a>
-          <a class="btn btn-light" href="team.html">Meet the team</a>
-        </div>
-      </div>
-    </section>
   </main>
 
   <footer class="site-footer">
     <div class="container">
-      <div class="footer-grid">
-        <div>
-          <div class="footer-brand">
-            <span class="brand-mark" aria-hidden="true">R</span>
-            <b>Regenesis International Group</b>
-          </div>
-          <p class="footer-blurb">An international liaison company connecting medical institutions and corporations across Japan and Southeast Asia.</p>
-        </div>
-        <div class="footer-col">
-          <h4>Company</h4>
-          <ul>
-            <li><a href="about.html">About</a></li>
-            <li><a href="team.html">Team</a></li>
-            <li><a href="process.html">Our process</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Expertise</h4>
-          <ul>
-            <li><a href="services.html">Services</a></li>
-            <li><a href="network.html">Network</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Contact</h4>
-          <ul>
-            <li><a href="contact.html">Get in touch</a></li>
-            <li><p>Tokyo · Kuala Lumpur</p></li>
-          </ul>
-        </div>
-      </div>
+      <a class="wordmark" href="index.html">REGENESIS</a>
+      <p class="footer-line">Regenesis International Group · <a href="mailto:info@regenig.com">info@regenig.com</a></p>
+      <p class="footer-line">Kuala Lumpur · Partner clinics in Tokyo</p>
+      <ul class="footer-nav">
+        <li><a href="about.html">About</a></li>
+        <li><a href="partners.html">Partners</a></li>
+        <li><a href="index.html#enquire">Enquire</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="disclaimer.html">Disclaimer</a></li>
+      </ul>
       <div class="footer-legal">
-        <p>RIG provides business development and liaison services only. We do not provide medical treatment, medical advice, or regulated medical services of any kind. <a href="disclaimer.html">Read full disclaimer</a>.</p>
-        <p>No accounts, no trackers, no third-party font or analytics requests. <a href="disclaimer.html">How personal data is handled</a>.</p>
-        <p>© 2026 Regenesis International Group. All rights reserved.</p>
+        <p class="treatment">Treatment is provided solely by licensed physicians at our partner clinics.</p>
+        <p>Regenesis International Group arranges private enquiries, introductions and coordination. We do not provide medical treatment or medical advice. <a href="disclaimer.html">Disclaimer</a>.</p>
+        <p>No accounts, no trackers, no third-party font or analytics requests. <a href="privacy.html">How personal data is handled</a>.</p>
+        <!-- OPEN ITEM: registered company name + number go here once supplied. -->
+        <p>© 2026 Regenesis International Group.</p>
       </div>
     </div>
   </footer>
+  <script src="assets/js/site.js" defer></script>
 </body>
 </html>

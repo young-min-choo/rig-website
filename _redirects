@@ -1,0 +1,13 @@
+# Cloudflare Pages redirects. v1 URLs → their new homes (same targets as the
+# meta-refresh stubs, which stay in the repo for any host without this file).
+# Both the .html and the extensionless form are listed because Pages serves clean URLs.
+/services.html  /#regenerative-medicine  301
+/services       /#regenerative-medicine  301
+/process.html   /#journey                301
+/process        /#journey                301
+/network.html   /partners                301
+/network        /partners                301
+/team.html      /about#leadership        301
+/team           /about#leadership        301
+/contact.html   /#enquire                301
+/contact        /#enquire                301

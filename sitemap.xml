@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Clean URLs: Cloudflare Pages serves /about.html at /about (and / for index.html).
+     Keep in step with the <link rel="canonical"> on each page; tests/static-check.mjs enforces it. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://regenig.com/</loc></url>
+  <url><loc>https://regenig.com/about</loc></url>
+  <url><loc>https://regenig.com/partners</loc></url>
+  <url><loc>https://regenig.com/privacy</loc></url>
+  <url><loc>https://regenig.com/disclaimer</loc></url>
+</urlset>

@@ -98,6 +98,9 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   width: 56px; height: 1px; background: var(--gold); border: 0;
   margin-block: 2.2rem;
 }
+/* spacing helpers (replace former inline style attributes; the CSP forbids those) */
+.stack-md { margin-block-start: 1.2rem; }
+.stack-lg { margin-block-start: 1.6rem; }
 .center { text-align: center; }
 .center .rule { margin-inline: auto; }
 .center .prose p { margin-inline: auto; }

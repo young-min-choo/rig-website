@@ -75,8 +75,10 @@
     <section class="band center" id="become-a-partner" aria-labelledby="bp-h">
       <div class="narrow">
         <h2 id="bp-h">Become a Partner</h2>
-        <form class="form" data-endpoint="" action="#" method="post" novalidate>
+        <!-- Delivered to info@regenig.com by functions/api/enquiry.js. Without JS this is a normal POST (303 → thanks / error page). -->
+        <form class="form" data-endpoint="/api/enquiry" action="/api/enquiry" method="post" novalidate>
           <input type="hidden" name="form" value="partner-enquiry">
+          <div class="hp" aria-hidden="true"><label for="pf-website">Leave this field empty</label><input id="pf-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
           <div class="field"><label for="pf-name">Name</label><input id="pf-name" name="name" autocomplete="name" required></div>
           <div class="field"><label for="pf-pos">Position</label><input id="pf-pos" name="position" autocomplete="organization-title" required></div>
           <div class="field"><label for="pf-org">Organisation</label><input id="pf-org" name="organisation" autocomplete="organization" required></div>

@@ -114,9 +114,10 @@
       <div class="narrow">
         <h2 id="enquire-h">Private Enquiries</h2>
         <p class="lede" style="margin-block-start:1.2rem">A dedicated coordinator will contact you personally, in confidence.</p>
-        <!-- data-endpoint stays empty until delivery to info@regenig.com is wired; site.js says so honestly. -->
-        <form class="form" data-endpoint="" action="#" method="post" novalidate>
+        <!-- Delivered to info@regenig.com by functions/api/enquiry.js. Without JS this is a normal POST (303 → thanks / error page). -->
+        <form class="form" data-endpoint="/api/enquiry" action="/api/enquiry" method="post" novalidate>
           <input type="hidden" name="form" value="private-enquiry">
+          <div class="hp" aria-hidden="true"><label for="pe-website">Leave this field empty</label><input id="pe-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
           <div class="field"><label for="pe-name">Name</label><input id="pe-name" name="name" autocomplete="name" required></div>
           <div class="field"><label for="pe-email">Email</label><input id="pe-email" name="email" type="email" autocomplete="email" required></div>
           <div class="field"><label for="pe-wa">WhatsApp <span class="opt">(optional)</span></label><input id="pe-wa" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel"></div>

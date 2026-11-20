@@ -282,6 +282,11 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 .form .btn { justify-self: start; }
 .form-status { font-size: 0.92rem; color: var(--gold-2); min-height: 1.4em; }
 .center .form .btn { justify-self: center; }
+/* spam trap: out of sight, out of the tab order and hidden from assistive tech */
+.hp {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; opacity: 0; pointer-events: none;
+}
 
 /* ============ footer ============ */
 .site-footer { background: var(--night); border-block-start: 1px solid var(--line); padding-block: 4.5rem 3rem; text-align: center; }
@@ -313,6 +318,10 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   border: 1px solid var(--gold-line); padding: 1.2rem 1.4rem; margin-block-end: 3rem;
   font-size: 0.9rem; color: var(--ivory-2);
 }
+
+/* ============ thanks / error / 404 ============ */
+.status-page { min-height: 72svh; display: grid; align-content: center; }
+.status-alt { margin-block-start: 1.8rem; font-size: 0.9rem; }
 
 /* ============ redirect stubs ============ */
 .moved { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 2rem; }

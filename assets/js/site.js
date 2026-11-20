@@ -2,8 +2,9 @@
    1. Header turns solid once the home hero scrolls away.
    2. Hero video: loaded only when footage is configured AND the visitor has not
       asked for reduced motion or data saving. Otherwise the still image stays.
-   3. Forms: post to data-endpoint when one is configured; until then, say so
-      plainly instead of pretending to send. */
+   3. Forms: post to data-endpoint (/api/enquiry) with Accept: application/json
+      and show the outcome inline. Without JS the form is a normal POST that
+      lands on thanks.html or enquiry-error.html. */
 (function () {
   "use strict";
 
@@ -44,6 +45,10 @@
       var endpoint = form.getAttribute("data-endpoint");
       if (!endpoint) {
         status.textContent = "Online enquiries open shortly. Until then, please write to info@regenig.com.";
+        return;
+      }
+      if (typeof form.checkValidity === "function" && !form.checkValidity()) {
+        status.textContent = "Please complete the required fields and tick the consent box.";
         return;
       }
       var btn = form.querySelector("button[type=submit]");

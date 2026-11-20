@@ -16,12 +16,12 @@
 
 export const MAX_BODY_BYTES = 32 * 1024;
 
-const LIMITS = {
+export const LIMITS = {
   name: 200, position: 200, organisation: 200, country: 200,
   email: 254, whatsapp: 40, message: 5000,
 };
 
-const FORMS = {
+export const FORMS = {
   "private-enquiry": {
     required: ["name", "email", "message"],
     optional: ["whatsapp"],

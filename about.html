@@ -67,29 +67,33 @@
     <section class="band band-alt center" id="leadership" aria-labelledby="lead-h">
       <div class="container">
         <h2 id="lead-h">Leadership</h2>
+        <!-- Photos: once a file is in assets/team/ (see assets/team/README.md), add
+             <img src="assets/team/NAME.jpg" alt="FULL NAME" loading="lazy"> after that member's .initial span.
+             No <img> until the file exists: a missing file 404s on every visit, and the old inline onerror
+             handler is blocked by the Content-Security-Policy. -->
         <ul class="leaders">
           <li class="leader">
-            <div class="leader-photo"><span class="initial" aria-hidden="true">W</span><img src="assets/team/luqman.jpg" alt="Wan Luqman Hakim" loading="lazy" onerror="this.remove()"></div>
+            <div class="leader-photo"><span class="initial" aria-hidden="true">W</span></div>
             <h3>Wan Luqman Hakim</h3>
             <p class="title">Chief Executive Officer</p>
           </li>
           <li class="leader">
-            <div class="leader-photo"><span class="initial" aria-hidden="true">C</span><img src="assets/team/choo.jpg" alt="Choo Young Min" loading="lazy" onerror="this.remove()"></div>
+            <div class="leader-photo"><span class="initial" aria-hidden="true">C</span></div>
             <h3>Choo Young Min</h3>
             <p class="title">Chief Technology Officer</p>
           </li>
           <li class="leader">
-            <div class="leader-photo"><span class="initial" aria-hidden="true">S</span><img src="assets/team/shiv.jpg" alt="Shiv Nanda" loading="lazy" onerror="this.remove()"></div>
+            <div class="leader-photo"><span class="initial" aria-hidden="true">S</span></div>
             <h3>Shiv Nanda</h3>
             <p class="title">Chief Operating Officer</p>
           </li>
           <li class="leader">
-            <div class="leader-photo"><span class="initial" aria-hidden="true">L</span><img src="assets/team/lucas.jpg" alt="Dr. Lucas" loading="lazy" onerror="this.remove()"></div>
+            <div class="leader-photo"><span class="initial" aria-hidden="true">L</span></div>
             <h3>Dr. Lucas</h3>
             <p class="title">Medical Advisor</p>
           </li>
           <li class="leader">
-            <div class="leader-photo"><span class="initial" aria-hidden="true">A</span><img src="assets/team/aya.jpg" alt="Aya Ogawa" loading="lazy" onerror="this.remove()"></div>
+            <div class="leader-photo"><span class="initial" aria-hidden="true">A</span></div>
             <h3>Aya Ogawa</h3>
             <p class="title">Head of Japan Operations</p>
           </li>

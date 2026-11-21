@@ -163,6 +163,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 .lang .sep { opacity: 0.5; }
 
 .nav-toggle { display: none; }
+.nav-toggle:focus-visible + .burger { outline: 2px solid var(--gold); outline-offset: 2px; }
 .burger { display: none; width: 44px; height: 44px; cursor: pointer; place-items: center; }
 .burger span, .burger span::before, .burger span::after {
   content: ""; display: block; width: 22px; height: 1px; background: var(--ivory); position: relative;
@@ -270,7 +271,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   display: block; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.22em;
   text-transform: uppercase; color: var(--ivory-3); margin-block-end: 0.5rem;
 }
-.field .opt { text-transform: none; letter-spacing: 0.02em; color: var(--ivory-4); }
+.field .opt { text-transform: none; letter-spacing: 0.02em; color: var(--ivory-3); } /* ivory-4 measured 3.2:1 */
 .field input, .field textarea {
   width: 100%; font: inherit; font-size: 1rem; color: var(--ivory);
   background: transparent; border: 0; border-block-end: 1px solid var(--line-2);
@@ -290,6 +291,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap; opacity: 0; pointer-events: none;
 }
+.hp input { width: 1px; height: 1px; }
 
 /* ============ footer ============ */
 .site-footer { background: var(--night); border-block-start: 1px solid var(--line); padding-block: 4.5rem 3rem; text-align: center; }
@@ -303,7 +305,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 .footer-nav a { font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ivory-3); text-decoration: none; }
 .footer-nav a:hover { color: var(--gold); }
 .footer-legal { max-width: 720px; margin-inline: auto; border-block-start: 1px solid var(--line); padding-block-start: 2rem; }
-.footer-legal p { font-size: 0.8rem; color: var(--ivory-4); line-height: 1.7; }
+.footer-legal p { font-size: 0.8rem; color: var(--ivory-3); line-height: 1.7; } /* ivory-4 measured 3.2:1 */
 .footer-legal p + p { margin-block-start: 0.6rem; }
 .footer-legal .treatment { font-family: var(--serif); font-style: italic; font-size: 1rem; color: var(--ivory-3); }
 .footer-legal a { color: var(--ivory-3); }
@@ -344,10 +346,15 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 }
 @media (max-width: 860px) {
   .burger { display: grid; }
+  /* keep the menu checkbox in the tab order (visually hidden) so the burger works from the keyboard */
+  .nav-toggle {
+    display: block; position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
   .nav-menu {
     position: absolute; top: var(--header-h); inset-inline: 0;
     flex-direction: column; align-items: stretch; gap: 0;
-    background: rgba(10, 13, 20, 0.98); border-block-end: 1px solid var(--line);
+    background: var(--night); border-block-end: 1px solid var(--line); /* opaque: page text showed through 0.98 under the header backdrop-filter */
     padding: 0.8rem 6% 1.6rem; display: none;
   }
   .nav-menu li a { display: block; padding-block: 0.95rem; border-block-end: 1px solid var(--line); }

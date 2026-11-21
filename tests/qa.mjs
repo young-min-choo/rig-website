@@ -479,6 +479,46 @@ for (const vp of VIEWPORTS) {
       await page.waitForTimeout(50);
       check(`${id}: counter back to "0 / 5,000" after the form resets`, (await num.textContent()) === "0 / 5,000", await num.textContent());
       check(`${id}: no CSP violations or errors around the counter`, (await page.evaluate(() => window.__csp)).length === 0 && log.pageErrors.length === 0, log.pageErrors.join(" | "));
+
+      // review C4-3: near the limit, steady typing is announced once (after a pause), not once per key
+      await page.fill(msgSel, "n".repeat(4600));
+      await settle();
+      await page.evaluate(() => {
+        window.__live = [];
+        const l = document.querySelector("form [data-count-live]");
+        if (l) new MutationObserver((recs) => recs.forEach(() => window.__live.push(l.textContent))).observe(l, { childList: true, characterData: true, subtree: true });
+      });
+      await page.focus(msgSel);
+      await page.keyboard.press("End");
+      await page.keyboard.type("abcdefghijkl", { delay: 120 });
+      await settle();
+      const spoken = await page.evaluate(() => window.__live);
+      check(`${id}: 12 keystrokes near the limit give one polite announcement`, spoken.length === 1 && spoken[0] === "388 characters left.", JSON.stringify(spoken));
+
+      // review C4-2: the "too long" status clears once the message fits again
+      for (const [k, v] of Object.entries(fields)) if (k !== "msg") await page.fill(`#${prefix}-${k}`, v);
+      await page.check(`#${prefix}-consent`);
+      await page.fill(msgSel, "a".repeat(6000));
+      await page.locator("form button[type=submit]").click();
+      await page.waitForTimeout(150);
+      const blockedSt = await status.textContent();
+      await page.fill(msgSel, "a".repeat(5500));
+      const stillOver = await status.textContent();
+      await page.fill(msgSel, "a".repeat(4000));
+      const fits = await status.textContent();
+      check(`${id}: "too long" status stays while still over, clears once within the limit`,
+        /^Messages are limited/.test(blockedSt) && stillOver === blockedSt && fits === "", JSON.stringify([blockedSt, stillOver, fits]));
+
+      // review C4-1: Back restores the text after load without an input event; the counter must show it
+      await page.fill(msgSel, "a".repeat(5100));
+      await Promise.all([page.waitForURL("**/privacy.html", { timeout: 5000 }), page.click(".consent a[href='privacy.html']")]);
+      await page.goBack({ waitUntil: "load" });
+      await waitOrFail(`${id}: restored text (Back) counted`, () => page.waitForFunction((p) =>
+        document.getElementById(`${p}-msg`).value.length === 5100, prefix, { timeout: 3000 }));
+      await page.waitForTimeout(200);
+      const restored = await num.textContent();
+      check(`${id}: after Back the counter shows the restored text ("5,100 / 5,000", over state)`, restored === "5,100 / 5,000" &&
+        (await countClass()).includes("is-over") && (await page.getAttribute(msgSel, "aria-invalid")) === "true", restored);
     }
     await page.close();
   }

@@ -56,11 +56,13 @@
     var status = form.querySelector(".form-status");
     var msg = form.querySelector("textarea[data-maxchars]");
     var limit = msg ? parseInt(msg.getAttribute("data-maxchars"), 10) : 0;
-    var num = null, count = null, live = null, liveTimer = null;
+    var num = null, count = null, live = null, liveTimer = null, blocked = false;
 
     function update() {
       var n = countChars(msg.value);
       var over = n > limit;
+      // the "too long" status goes once the message fits again
+      if (blocked && !over) { blocked = false; status.textContent = ""; }
       num.textContent = fmt(n) + " / " + fmt(limit);
       count.classList.toggle("is-over", over);
       if (over) msg.setAttribute("aria-invalid", "true"); else msg.removeAttribute("aria-invalid");
@@ -91,11 +93,15 @@
       msg.setAttribute("aria-describedby", ((msg.getAttribute("aria-describedby") || "") + " " + count.id).trim());
       msg.addEventListener("input", update);
       form.addEventListener("reset", function () { setTimeout(update, 0); });
+      // the browser restores typed text after load without an input event (e.g. on Back)
+      window.addEventListener("load", update);
+      window.addEventListener("pageshow", update);
       update();
     }
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      blocked = false;
       var endpoint = form.getAttribute("data-endpoint");
       if (!endpoint) {
         status.textContent = "Online enquiries open shortly. Until then, please write to info@regenig.com.";
@@ -103,6 +109,7 @@
       }
       if (msg && limit > 0 && countChars(msg.value) > limit) {
         status.textContent = tooLongText(limit, countChars(msg.value) - limit);
+        blocked = true;
         msg.focus();
         return;
       }

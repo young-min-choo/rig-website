@@ -278,8 +278,10 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   padding: 0.7rem 0; border-radius: 0; transition: border-color 0.25s;
 }
 .field textarea { min-height: 140px; resize: vertical; }
-.field input:focus, .field textarea:focus { outline: none; border-color: var(--gold); }
-.field input:focus-visible, .field textarea:focus-visible { outline: none; }
+/* focus: a 2px gold underline (padding drops 1px so nothing shifts); the checkbox keeps the global 2px ring */
+.field input:focus, .field textarea:focus {
+  outline: none; border-color: var(--gold); border-block-end-width: 2px; padding-block-end: calc(0.7rem - 1px);
+}
 .consent { display: grid; grid-template-columns: auto 1fr; gap: 0.9rem; align-items: start; font-size: 0.88rem; color: var(--ivory-3); }
 .consent input { width: 18px; height: 18px; margin-block-start: 0.2rem; accent-color: var(--gold); }
 .form-hint { font-size: 0.85rem; color: var(--ivory-3); }

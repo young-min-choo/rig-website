@@ -54,12 +54,12 @@ class HttpError extends Error {
 
 function log(form, outcome, status) {
   // The only log line this function writes. Keep it free of personal data.
-  console.log(JSON.stringify({ fn: "enquiry", form: FORMS[form] ? form : "unknown", outcome, status }));
+  console.log(JSON.stringify({ fn: "enquiry", form: Object.hasOwn(FORMS, form) ? form : "unknown", outcome, status }));
 }
 
-/** Remove CR/LF (and other control characters) from header-bound values. */
+/** Remove CR/LF and other control characters (C0, DEL, C1 incl. NEL, U+2028/2029) from header-bound values. */
 export function oneLine(value) {
-  return String(value).replace(/[\r\n\u0000-\u001f\u007f\u2028\u2029]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  return String(value).replace(/[\r\n\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
 function wantsJson(request) {

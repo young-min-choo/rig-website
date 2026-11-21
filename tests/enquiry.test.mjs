@@ -289,6 +289,30 @@ test("CR/LF in name/organisation is stripped from subject and fields", async () 
   assert.ok(f2.calls[0].body.text.includes("Name: A B"));
 });
 
+test("C1 controls (NEL U+0085 etc.), DEL and U+2028/2029 are stripped from header-bound values", async () => {
+  const f = fakeFetch();
+  const name = "Ann\u0085Bcc: x@evil.io\u0080A\u009fB\u007fC\u2028D\u2029E";
+  const res = await handle(formRequest({ ...PRIVATE, name }, { encoding: "urlencoded" }), ENV, f);
+  assert.equal(res.status, 200);
+  const { body } = f.calls[0];
+  assert.doesNotMatch(body.subject, /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
+  assert.equal(body.subject, "[Website] Private enquiry — Ann Bcc: x@evil.io A B C D E");
+  assert.ok(body.text.includes("Name: Ann Bcc: x@evil.io A B C D E"));
+});
+
+test("log line never echoes an unknown form type, including Object.prototype keys", async () => {
+  for (const form of ["__proto__", "toString", "constructor", "hasOwnProperty", "nope"]) {
+    const lines = [];
+    const orig = console.log;
+    console.log = (...a) => lines.push(a.join(" "));
+    let res;
+    try { res = await handle(formRequest({ ...PRIVATE, form }), ENV, fakeFetch()); } finally { console.log = orig; }
+    assert.equal(res.status, 400, form);
+    assert.equal(lines.length, 1, form);
+    assert.deepEqual(JSON.parse(lines[0]), { fn: "enquiry", form: "unknown", outcome: "unknown_form", status: 400 }, form);
+  }
+});
+
 // ---------- upstream + config ----------
 
 test("upstream 500 → 502", async () => {

@@ -200,11 +200,17 @@ integration later, which is fine because there is no build step):
 
 ```bash
 set -a; . ~/.config/rig/cloudflare.env; set +a
-npx wrangler pages project create regenig --production-branch main
+PROJECT=regenig        # if wrangler says the name is taken, set another name here and re-run
+npx wrangler pages project create "$PROJECT" --production-branch main
+# remember the name: every later block loads it from the same file
+grep -q '^PROJECT=' ~/.config/rig/cloudflare.env || echo "PROJECT=$PROJECT" >> ~/.config/rig/cloudflare.env
 ```
 
-If the name `regenig` is taken, pick another; every later command uses `--project-name <that name>`,
-and its address is `https://<that name>.pages.dev`.
+From here on, **`<project>`** means the name that worked (normally `regenig`): the project is
+`<project>` in the dashboard, its address is `https://<project>.pages.dev`, and the shell blocks
+use `$PROJECT` (loaded with the `set -a; . ~/.config/rig/cloudflare.env; set +a` line). The
+`_headers` rule `https://:project.pages.dev/*` matches any project name, so `<project>.pages.dev`
+is served `X-Robots-Tag: noindex` whatever the name is.
 
 3.2 Deploy. Publish only the site files: the repo also holds tests, docs and scripts that should
 not be public. The `functions/` folder is picked up from the **current directory**, so run this
@@ -212,6 +218,7 @@ from the repo root:
 
 ```bash
 cd ~/dev/rig-website            # the checkout on the branch being launched
+set -a; . ~/.config/rig/cloudflare.env; set +a   # token, account ID, PROJECT
 git status --short              # must print nothing (deploy committed work only)
 node --test tests/ && node tests/static-check.mjs && node tests/qa.mjs   # all must pass
 
@@ -219,13 +226,13 @@ DIST=$(mktemp -d)
 rsync -a --exclude='.*' --exclude='*.md' --exclude='tests/' --exclude='docs/' \
       --exclude='scripts/' --exclude='functions/' ./ "$DIST"/
 ls "$DIST"                      # expect: *.html, _headers, _redirects, robots.txt, sitemap.xml, assets/
-npx wrangler pages deploy "$DIST" --project-name regenig --branch main
+npx wrangler pages deploy "$DIST" --project-name "$PROJECT" --branch main
 ```
 
 wrangler prints the deployment URL and says it compiled a Worker from `functions/`. If it does
 not mention Functions, you ran it from the wrong directory.
 
-3.3 Environment variables. Workers & Pages → `regenig` → Settings → **Variables and Secrets**,
+3.3 Environment variables. Workers & Pages → `<project>` → Settings → **Variables and Secrets**,
 environment **Production**. Names must be exactly these (they are read by
 `functions/api/enquiry.js`):
 
@@ -233,7 +240,7 @@ environment **Production**. Names must be exactly these (they are read by
 |---|---|---|
 | `MAIL_TO` | Plaintext | `info@regenig.com` |
 | `MAIL_FROM` | Plaintext | `Regenesis Website <website@send.regenig.com>` |
-| `ALLOWED_ORIGINS` | Plaintext | `https://regenig.com,https://www.regenig.com,https://regenig.pages.dev` (drop the pages.dev entry at step 4d.5) |
+| `ALLOWED_ORIGINS` | Plaintext | `https://regenig.com,https://www.regenig.com,https://<project>.pages.dev` with `<project>` replaced by the name from 3.1 (drop the pages.dev entry at step 4d.5) |
 | `RESEND_API_KEY` | **Secret** | set in step 4c.4, never in plaintext |
 | `RESEND_API_URL` | – | **do not set** (tests only; production uses `https://api.resend.com/emails`) |
 
@@ -242,10 +249,12 @@ slash), so it must list full `https://` origins, comma-separated, no paths.
 
 Variables apply to **new** deployments only: after any change, run the deploy command from 3.2 again.
 
-3.4 Check the function is live, without sending anything:
+3.4 Check the function is live, without sending anything, and that pages.dev is not indexable:
 
 ```bash
-curl -s -X POST https://regenig.pages.dev/api/enquiry -H 'Accept: application/json'; echo
+set -a; . ~/.config/rig/cloudflare.env; set +a
+curl -s -X POST "https://$PROJECT.pages.dev/api/enquiry" -H 'Accept: application/json'; echo
+curl -sI "https://$PROJECT.pages.dev/" | grep -i '^x-robots-tag'      # x-robots-tag: noindex (R1)
 ```
 
 - `{"ok":false,"error":"unavailable"}` (HTTP 503) = the function runs but a variable is missing.
@@ -253,7 +262,10 @@ curl -s -X POST https://regenig.pages.dev/api/enquiry -H 'Accept: application/js
 - `{"ok":false,"error":"forbidden"}` (HTTP 403) = configured; curl sent no allowed Origin, so it
   was refused. This is the expected answer once all four variables are set.
 
-Open `https://regenig.pages.dev/` in a browser and click through the pages. The address bar
+If the second command prints nothing, the deployment is missing the `_headers` file (check the
+`ls "$DIST"` output in 3.2); do not continue until it prints `noindex`.
+
+Open `https://<project>.pages.dev/` in a browser and click through the pages. The address bar
 still shows pages.dev; regenig.com is untouched.
 
 ---
@@ -334,19 +346,19 @@ None of these touch the root records: the root MX stays `smtp.google.com` and th
 
 ```bash
 set -a; . ~/.config/rig/cloudflare.env; set +a
-npx wrangler pages secret put RESEND_API_KEY --project-name regenig
+npx wrangler pages secret put RESEND_API_KEY --project-name "$PROJECT"
 ```
 
 Then redeploy (3.2) so the new deployment picks the secret up.
 
 4c.5 Test on pages.dev (this sends one real email to info@):
 - `curl` from 3.4 now returns `{"ok":false,"error":"forbidden"}`.
-- Submit both forms on `https://regenig.pages.dev/` (Home → Private Enquiries; Partners → Become
+- Submit both forms on `https://<project>.pages.dev/` (Home → Private Enquiries; Partners → Become
   a Partner) with your own name and email and a test message. The status line must say "Thank you."
 - In info@ the messages arrive with the subjects `[Website] Private enquiry — <your name>` and
   `[Website] Partner enquiry — <your organisation>`, from `website@send.regenig.com`; pressing
   Reply addresses the enquirer. If they land in Spam, mark them "Not spam" once.
-- Logs, if needed: `npx wrangler pages deployment tail --project-name regenig`. Each request writes
+- Logs, if needed: `npx wrangler pages deployment tail --project-name "$PROJECT"`. Each request writes
   one line such as `{"fn":"enquiry","form":"private-enquiry","outcome":"sent","status":200}`; the
   function never logs names, emails, phone numbers, messages or IPs.
 
@@ -357,10 +369,24 @@ unreachable → visitor sees the error page), `config_missing`.
 
 ### 4d. Website cutover (regenig.com shows the new site)
 
-1. Workers & Pages → `regenig` → **Custom domains** → Set up a custom domain → `regenig.com`.
+This step makes both forms public. Pre-flight (all must be true):
+- [ ] **Final Privacy Policy published.** The deployed `privacy.html` is the final, owner-approved
+      text (Luqman's OK in writing): it names **Cloudflare** (hosting and the form function),
+      **Resend** (form delivery, with the region chosen in 4c.2) and Google Workspace (the info@
+      mailbox), and it has no draft banner or `[bracketed]` placeholders left. Check the deployed copy:
+
+      ```bash
+      set -a; . ~/.config/rig/cloudflare.env; set +a
+      curl -s "https://$PROJECT.pages.dev/privacy" | grep -ciE 'draft for review|draft-mark|will be finalised'   # must print 0
+      curl -s "https://$PROJECT.pages.dev/privacy" | grep -oiE 'cloudflare|resend' | sort -fu                       # must list both
+      ```
+      If either check fails, stop here: forms must not go public before the final policy.
+- [ ] 4c.5 passed: both test enquiries arrived in info@.
+
+1. Workers & Pages → `<project>` → **Custom domains** → Set up a custom domain → `regenig.com`.
    Cloudflare offers to update DNS: accept. If it reports that records already exist, delete the
    four Squarespace `A` records for `@` on the DNS page and try again. The apex then points at
-   `regenig.pages.dev` (proxied, orange cloud).
+   `<project>.pages.dev` (proxied, orange cloud).
 2. Same screen → add `www.regenig.com`. Accept the DNS update; if it reports a conflict, delete
    the `www` CNAME to `ext-sq.squarespace.com` first.
 3. www → apex redirect. Rules → **Redirect Rules** → Create rule (or the template "Redirect from
@@ -371,7 +397,20 @@ unreachable → visitor sees the error page), `config_missing`.
 4. Wait for both custom domains to show **Active** (certificate issued; usually minutes).
 5. Edit `ALLOWED_ORIGINS` to `https://regenig.com,https://www.regenig.com` (remove pages.dev)
    and redeploy (3.2).
-6. Run the checks in section 6.
+6. Rate limit the form endpoint (the Free plan includes exactly one rate limiting rule). Scripts can
+   fake the `Origin` header, so without this a flood that leaves the honeypot empty is stopped only
+   by Resend's sending quota, and once that is used up real visitors get the error page.
+   Security → WAF → **Rate limiting rules** → Create rule:
+   - Rule name: `enquiry-flood`
+   - If incoming requests match: Field **URI Path**, Operator **equals**, Value `/api/enquiry`
+     (the Free plan allows only the path field, so this counts every method on that path)
+   - With the same characteristics: **IP** (fixed on Free)
+   - When rate exceeds: **5** requests per **10 seconds** (the only Free period)
+   - Then take action: **Block** (default response, HTTP 429), for **10 seconds** (the only Free duration)
+   - Deploy. A real visitor sends one request per enquiry, so 5 in 10 s never affects them.
+   The rule covers regenig.com and www (they run through the zone). `<project>.pages.dev` is outside
+   the zone and is not covered; Resend's quota remains the backstop there.
+7. Run the checks in section 6.
 
 ---
 
@@ -396,8 +435,24 @@ because some resolvers keep asking Cloudflare until the delegation TTL runs out;
 records on both sides mean mail is safe either way. DNSSEC can be turned back on at Squarespace
 once things are stable.
 
+**If the rollback happens after 4c or 4d**, some records exist **only in Cloudflare** and are not
+in the 0.4 screenshot: the `_dmarc` TXT (step 1.3) and the three Resend records from 4c.3
+(`resend._domainkey.send` TXT, `send.send` MX, `send.send` TXT). Before switching the
+nameservers back, add each of them in Squarespace's DNS settings with the exact name, value and
+priority shown on the Cloudflare DNS page. Without them, website form mail stops (Resend can no
+longer sign or verify `send.regenig.com`) and the domain loses its DMARC record. Check afterwards:
+
+```bash
+for q in "_dmarc.regenig.com TXT" "resend._domainkey.send.regenig.com TXT" "send.send.regenig.com MX" "send.send.regenig.com TXT"; do
+  set -- $q; echo "== $1 $2"; curl -s "https://dns.google/resolve?name=$1&type=$2" | jq -r '.Answer[]?.data'
+done   # every name must print its value
+```
+
+Delete the Rate limiting rule only together with the Cloudflare zone; it has no effect once the
+nameservers point back to Squarespace.
+
 5.2 **Website-only rollback** (site problem after 4d; mail unaffected):
-- Bad release: Workers & Pages → `regenig` → Deployments → pick the previous good deployment →
+- Bad release: Workers & Pages → `<project>` → Deployments → pick the previous good deployment →
   **Rollback**. Takes effect in seconds.
 - Back to the Coming Soon page: remove both custom domains in Pages, delete the Redirect Rule,
   and re-create the four Squarespace `A` records and the `www` CNAME (DNS only) from step 1.3.
@@ -410,6 +465,8 @@ once things are stable.
 Run after 4d and after every later deploy. Copy-paste:
 
 ```bash
+set -a; . ~/.config/rig/cloudflare.env; set +a   # PROJECT
+
 # headers from _headers: CSP, HSTS, nosniff, referrer, permissions, frame
 curl -sI https://regenig.com/ | grep -iE '^(content-security-policy|strict-transport-security|x-content-type-options|referrer-policy|permissions-policy|x-frame-options):'
 
@@ -434,8 +491,13 @@ curl -s -X POST https://regenig.com/api/enquiry -H 'Accept: application/json'; e
 # nothing injected by Cloudflare (must print nothing)
 curl -s https://regenig.com/ | grep -iE 'cloudflareinsights|rocket-loader|email-decode|challenge-platform'
 
-# the Vercel preview stays out of search engines
+# indexing (R1): regenig.com indexable, the pages.dev host and the Vercel preview are not
+curl -sI https://regenig.com/ | grep -ic '^x-robots-tag'                                           # 0
+curl -sI "https://$PROJECT.pages.dev/" | grep -i '^x-robots-tag'                                   # noindex
 curl -sI https://regenig-preview.vercel.app/ | grep -i '^x-robots-tag'                             # noindex
+
+# rate limit on /api/enquiry (sends nothing: no Origin → 403 until the limit, then 429 from Cloudflare)
+for i in $(seq 1 8); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://regenig.com/api/enquiry; done; echo   # 403s, then 429s
 ```
 
 Then by hand:
@@ -453,8 +515,9 @@ Afterwards (owner decisions, not blocking launch):
 - Retire v1: GitHub repo Settings → Pages → unpublish `young-min-choo.github.io/rig-website/`,
   and retire or noindex the Vercel production alias `rig-website-five.vercel.app`, so only
   regenig.com and the noindex preview remain public.
-- `https://regenig.pages.dev` stays reachable. Every page's `<link rel="canonical">` points at
-  regenig.com, so search engines treat regenig.com as the original.
+- `https://<project>.pages.dev` stays reachable but is not indexable: `_headers` serves it
+  `X-Robots-Tag: noindex` (rule `https://:project.pages.dev/*`, checked in section 6), and every
+  page's `<link rel="canonical">` points at regenig.com. regenig.com itself gets no noindex.
 - DNSSEC back on: Cloudflare → DNS → Settings → DNSSEC → Enable; it shows a DS record (key tag,
   algorithm 13, digest type 2, digest). Add it in Squarespace's DNSSEC settings if Squarespace
   allows DS records with custom nameservers; if it does not, leave DNSSEC off.

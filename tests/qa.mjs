@@ -22,7 +22,7 @@ const SHOTS = join(homedir(), ".hermes/cache/scratch/rig-qa");
 const PW = process.env.PLAYWRIGHT_MODULE || "/home/min/dev/soren-jrpg/node_modules/playwright/index.mjs";
 const { chromium } = await import(pathToFileURL(PW).href);
 const { handle } = await import(pathToFileURL(join(ROOT, "functions/api/enquiry.js")).href);
-const { parseHeaders, parseCsp, REQUIRED_CSP } = await import(pathToFileURL(join(ROOT, "tests/lib/rules.mjs")).href);
+const { parseHeaders, parseCsp, REQUIRED_CSP, headersForUrl } = await import(pathToFileURL(join(ROOT, "tests/lib/rules.mjs")).href);
 
 const VIEWPORTS = [{ width: 390, height: 844 }, { width: 1440, height: 900 }];
 const PAGES = [
@@ -54,18 +54,17 @@ function check(name, ok, detail = "") {
 }
 
 
+// A wait that times out is a recorded failure, not a crash that skips every later check.
+async function waitOrFail(name, fn) {
+  try { await fn(); return true; } catch (e) { return check(name, false, String(e.message || e).split("\n")[0]); }
+}
+
 // ---------------------------------------------------------------- server
 const headerRules = parseHeaders(readFileSync(join(ROOT, "_headers"), "utf8"));
 const siteCsp = (headerRules.find((r) => r.pattern === "/*") || { headers: {} }).headers["content-security-policy"];
-function headersFor(pathname) {
-  const out = {};
-  for (const rule of headerRules) {
-    const p = rule.pattern;
-    const match = p.endsWith("*") ? pathname.startsWith(p.slice(0, -1)) : pathname === p;
-    if (match) Object.assign(out, rule.headers);
-  }
-  return out;
-}
+// Same matcher as tests/headers.test.mjs: path rules apply to every host; absolute-URL rules
+// (the R1 pages.dev noindex rule) only to their host, so they never apply to this local origin.
+const headersFor = (url) => headersForUrl(headerRules, url);
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
@@ -118,7 +117,7 @@ const server = http.createServer(async (req, res) => {
     const file = resolveFile(url.pathname);
     const status = file ? 200 : 404;
     const served = file || join(ROOT, "404.html");
-    res.writeHead(status, { "content-type": MIME[extname(served)] || "application/octet-stream", ...headersFor(url.pathname) });
+    res.writeHead(status, { "content-type": MIME[extname(served)] || "application/octet-stream", ...headersFor(url.href) });
     res.end(req.method === "HEAD" ? undefined : readFileSync(served));
   } catch (e) {
     res.writeHead(500); res.end(String(e));
@@ -240,6 +239,7 @@ for (const vp of VIEWPORTS) {
     const expectStatus = name === "404" ? 404 : 200;
     check(`${id}: HTTP ${expectStatus}`, response.status() === expectStatus, String(response.status()));
     check(`${id}: CSP header served`, response.headers()["content-security-policy"] === siteCsp && !!siteCsp);
+    check(`${id}: no X-Robots-Tag (site stays indexable off pages.dev)`, !("x-robots-tag" in response.headers()), response.headers()["x-robots-tag"]);
 
     // scroll through so lazy images load and any late errors surface
     await page.evaluate(async () => {
@@ -272,20 +272,31 @@ for (const vp of VIEWPORTS) {
 
     // keyboard focus: tab through every stop; links/buttons need a visible outline
     await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.scrollTo(0, 0); });
-    const bad = [];
+    const bad = [], badControls = [], controlsSeen = new Set();
     let stops = 0, hpFocused = false, firstKey = null;
     for (let i = 0; i < 80; i++) {
       await page.keyboard.press("Tab");
-      const f = await page.evaluate(() => {
+      const f = await page.evaluate(async () => {
         const el = document.activeElement;
         if (!el || el === document.body) return null;
+        // measure the settled focus style, not the first frame of a colour transition
+        await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {})));
         const s = getComputedStyle(el);
         let ring = s.outlineStyle !== "none" && parseFloat(s.outlineWidth) > 0;
         if (el.id === "nav-toggle") {
           const b = getComputedStyle(document.querySelector("label[for=nav-toggle]"));
           ring = b.outlineStyle !== "none" && parseFloat(b.outlineWidth) > 0;
         }
-        return { tag: el.tagName, id: el.id, name: el.name || "", text: (el.textContent || "").trim().slice(0, 24), ring, key: el.outerHTML.slice(0, 80) };
+        // form controls: a ≥2px outline, or a ≥2px underline in the brand gold
+        let control = null;
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) && el.type !== "hidden" && el.id !== "nav-toggle") {
+          const hex = getComputedStyle(document.documentElement).getPropertyValue("--gold").trim();
+          const gold = `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
+          const outline = s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2;
+          const underline = s.borderBottomStyle !== "none" && parseFloat(s.borderBottomWidth) >= 2 && s.borderBottomColor === gold;
+          control = { ok: outline || underline, desc: `${el.type || el.tagName.toLowerCase()} outline=${s.outlineStyle}/${s.outlineWidth} under=${s.borderBottomWidth}/${s.borderBottomColor}` };
+        }
+        return { tag: el.tagName, id: el.id, name: el.name || "", text: (el.textContent || "").trim().slice(0, 24), ring, control, key: el.outerHTML.slice(0, 80) };
       });
       if (!f) break;
       if (f.name === "website") hpFocused = true;
@@ -293,8 +304,17 @@ for (const vp of VIEWPORTS) {
       else if (f.key === firstKey) break; // wrapped around
       stops++;
       if ((["A", "BUTTON"].includes(f.tag) || f.id === "nav-toggle") && !f.ring) bad.push(`${f.tag} "${f.text || f.id}"`);
+      if (f.control) { controlsSeen.add(f.id || f.name); if (!f.control.ok) badControls.push(`#${f.id} ${f.control.desc}`); }
     }
     check(`${id}: focus visible on links/buttons (${stops} tab stops)`, bad.length === 0 && stops > 3, bad.slice(0, 5).join(", "));
+    // every visible form control must be reached by Tab and show a ≥2px focus indicator
+    const controls = await page.evaluate(() => [...document.querySelectorAll("input, textarea, select")]
+      .filter((el) => el.type !== "hidden" && el.id !== "nav-toggle" && el.tabIndex >= 0 && !el.closest("[aria-hidden=true]")).map((el) => el.id || el.name));
+    if (controls.length) {
+      const missed = controls.filter((c) => !controlsSeen.has(c));
+      check(`${id}: Tab reaches every form control (${controls.length})`, missed.length === 0, missed.join(", "));
+      check(`${id}: focus visible (≥2px) on inputs/textarea/checkbox`, badControls.length === 0 && controlsSeen.size >= controls.length, badControls.slice(0, 5).join(" | "));
+    }
     check(`${id}: honeypot never receives keyboard focus`, !hpFocused);
 
     await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.scrollTo({ top: 0, behavior: "instant" }); });
@@ -347,7 +367,7 @@ for (const vp of VIEWPORTS) {
     upstream.status = 200;
     const sent = upstream.calls.length;
     await page.locator("form button[type=submit]").click();
-    await page.waitForFunction(() => /Thank you|could not/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 });
+    await waitOrFail(`${id}: JS submit settles within 5 s`, () => page.waitForFunction(() => /Thank you|could not/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 }));
     check(`${id}: JS submit shows thank-you status`, /Thank you/.test(await status.textContent()), await status.textContent());
     const mail = upstream.calls[sent];
     check(`${id}: delivered once via function`, upstream.calls.length === sent + 1 && mail && mail.reply_to === fields.email && mail.to[0] === "info@regenig.com");
@@ -359,7 +379,7 @@ for (const vp of VIEWPORTS) {
     await page.check(`#${prefix}-consent`);
     upstream.status = 500;
     await page.locator("form button[type=submit]").click();
-    await page.waitForFunction(() => /could not/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 });
+    await waitOrFail(`${id}: upstream failure shows an error within 5 s`, () => page.waitForFunction(() => /could not/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 }));
     check(`${id}: upstream failure shows error status`, /info@regenig\.com/.test(await status.textContent()));
     upstream.status = 200;
     check(`${id}: zero third-party requests while submitting`, foreign(log.requests).length === 0);

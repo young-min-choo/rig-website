@@ -87,6 +87,7 @@ Still open (owners):
   root (site files only; `functions/` is compiled from the root). Custom domains `regenig.com` (canonical) and
   `www.regenig.com` (301 → apex). Exact steps, env vars, DNS order and rollback: [`docs/LAUNCH-RUNBOOK.md`](docs/LAUNCH-RUNBOOK.md).
 - **Preview:** `regenig-preview.vercel.app` (Vercel), `noindex` added at deploy time by a `vercel.json` outside this
-  repo. Do not add `noindex` to the repo.
+  repo. Do not add a site-wide `noindex` to the repo: the only one in `_headers` is the host-scoped
+  `https://:project.pages.dev/*` rule, so the production `*.pages.dev` address is never indexed while regenig.com is.
 - **v1 (GitHub Pages, push to `main`)** retires at cutover: unpublish it in the GitHub repo settings once regenig.com
   serves v2, and retire or noindex the `rig-website-five.vercel.app` alias.

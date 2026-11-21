@@ -13,7 +13,7 @@ import { join, dirname, resolve, relative, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp } from "./lib/rules.mjs";
+import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp, headersForUrl, PAGES_DEV_NOINDEX_PATTERN } from "./lib/rules.mjs";
 
 
 
@@ -202,7 +202,19 @@ check("404.html: only root-relative internal URLs (served at any path)",
   const longest = Math.max(0, ...cache.map((r) => Number(r.headers["cache-control"].match(/max-age=(\d+)/)[1])));
   check("long cache rule(s) under /assets/", longest >= 31536000, `max ${longest}`);
   for (const dir of ["img", "fonts"]) check(`/assets/${dir}/* cached a year`, cache.some((r) => r.pattern === `/assets/${dir}/*` && /max-age=31536000/.test(r.headers["cache-control"])));
-  check("no noindex in _headers (preview noindex is added at deploy time)", !/noindex/i.test(read("_headers")));
+  // R1: noindex only on the production *.pages.dev host; never on a path rule (those apply to
+  // regenig.com too) or on any other absolute-URL rule. The Vercel preview's noindex is added at deploy time.
+  const noindexRules = rules.filter((r) => Object.values(r.headers).some((v) => /noindex/i.test(v)));
+  for (const r of noindexRules) {
+    check(`_headers: noindex only on the pages.dev rule (found on "${r.pattern}")`, r.pattern === PAGES_DEV_NOINDEX_PATTERN);
+  }
+  const pd = rules.filter((r) => r.pattern === PAGES_DEV_NOINDEX_PATTERN);
+  check(`_headers: R1 rule "${PAGES_DEV_NOINDEX_PATTERN}" present once`, pd.length === 1, `${pd.length}`);
+  check(`_headers: R1 rule sets X-Robots-Tag: noindex`, pd.length === 1 && /^noindex$/i.test((pd[0].headers["x-robots-tag"] || "").trim()), pd[0] && pd[0].headers["x-robots-tag"]);
+  check("_headers: no header rule targets regenig.com by absolute URL", !rules.some((r) => /^https?:\/\/([^/]*\.)?regenig\.com/i.test(r.pattern)));
+  const canon = headersForUrl(rules, `${SITE}/`);
+  check("_headers: regenig.com/ resolves to no X-Robots-Tag", !("x-robots-tag" in canon), canon["x-robots-tag"]);
+  check("_headers: regenig.pages.dev/ resolves to X-Robots-Tag noindex", /noindex/i.test(headersForUrl(rules, "https://regenig.pages.dev/")["x-robots-tag"] || ""));
 }
 
 // What the markup would need beyond the CSP: inline script/style/handlers, remote origins.
@@ -280,6 +292,31 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   const css = read("assets/css/style.css");
   const hpRule = (css.match(/\.hp\s*\{([^}]*)\}/) || [])[1] || "";
   check("style.css: .hp is visually hidden", /position:\s*absolute/.test(hpRule) && /(clip-path|clip)\s*:/.test(hpRule));
+}
+
+// ---------- launch runbook gates (review cycle 1: F1, N3, N6, N7) ----------
+{
+  const rb = read("docs/LAUNCH-RUNBOOK.md");
+  const section = (start, end) => { const i = rb.indexOf(start); if (i < 0) return ""; const j = rb.indexOf(end, i + start.length); return rb.slice(i, j < 0 ? undefined : j); };
+  const s4d = section("### 4d.", "\n## ");
+  const s5 = section("## 5. Rollback", "\n## ");
+  const s6 = section("## 6. Post-launch checks", "\n## ");
+  const after = section("Afterwards (owner decisions", "\n## ");
+  // F1 / R1
+  check("runbook §6: pages.dev X-Robots-Tag noindex check", /curl -sI "https:\/\/\$PROJECT\.pages\.dev\/" \| grep -i '\^x-robots-tag'\s+# noindex/.test(s6));
+  check("runbook §6: regenig.com has no X-Robots-Tag check", /curl -sI https:\/\/regenig\.com\/ \| grep -ic '\^x-robots-tag'\s+# 0/.test(s6));
+  check("runbook Afterwards: pages.dev described as noindex, not just canonical", /pages\.dev` stays reachable but is not indexable/.test(after) && /X-Robots-Tag: noindex/.test(after));
+  // N3
+  check("runbook 4d: one Free-plan rate limiting rule on /api/enquiry", /Rate limiting rules/.test(s4d) && /URI Path[^\n]*\n?[^\n]*`\/api\/enquiry`/.test(s4d) && /\*\*Block\*\*/.test(s4d));
+  check("runbook §6: rate limit verified (429)", /seq 1 8[^\n]*\/api\/enquiry[^\n]*429/.test(s6));
+  // N6: privacy gate is a pre-flight, i.e. before step 1 of 4d
+  const gate = s4d.indexOf("Final Privacy Policy published"), step1 = s4d.indexOf("\n1. Workers & Pages");
+  check("runbook 4d: final Privacy Policy pre-flight before the cutover steps", gate > 0 && step1 > gate);
+  check("runbook 4d: privacy gate names Cloudflare + Resend", /Final Privacy Policy published[\s\S]*\*\*Cloudflare\*\*[\s\S]*\*\*Resend\*\*/.test(s4d.slice(0, step1 > 0 ? step1 : undefined)));
+  // N7
+  for (const rec of ["_dmarc", "resend._domainkey.send", "send.send"]) check(`runbook §5 rollback: re-add Cloudflare-only record ${rec}`, s5.includes(`\`${rec}\``));
+  check("runbook: ALLOWED_ORIGINS uses <project>.pages.dev", /\| `ALLOWED_ORIGINS` \|[^\n]*https:\/\/<project>\.pages\.dev/.test(rb));
+  check("runbook: no hard-coded regenig.pages.dev / --project-name regenig", !/regenig\.pages\.dev|--project-name regenig\b/.test(rb));
 }
 
 // ---------- report ----------

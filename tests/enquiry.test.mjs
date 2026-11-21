@@ -250,7 +250,7 @@ test("oversize body → 413 (declared length and streamed without length)", asyn
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     i: 0,
-    pull(c) { if (this.i++ < 40) c.enqueue(enc.encode("message=" + "q".repeat(1024) + "&")); else c.close(); },
+    pull(c) { if (this.i++ < MAX_BODY_BYTES / 1024 + 8) c.enqueue(enc.encode("message=" + "q".repeat(1024) + "&")); else c.close(); },
   });
   const req = new Request(`${ORIGIN}/api/enquiry`, {
     method: "POST", body: stream, duplex: "half",
@@ -373,6 +373,149 @@ test("no-JS failures → 303 /enquiry-error.html", async () => {
     assert.equal(res.headers.get("location"), "/enquiry-error.html");
   }
 });
+
+// ---------- review cycle 2: long CJK input, line breaks, partial-failure inputs ----------
+
+function rawRequest(body, contentType, { json = true, origin = ORIGIN } = {}) {
+  const h = new Headers({ origin, accept: json ? "application/json" : "text/html" });
+  if (contentType !== null) h.set("content-type", contentType);
+  // Uint8Array bodies get no implicit content-type, so "missing" really is missing.
+  return new Request(`${ORIGIN}/api/enquiry`, { method: "POST", headers: h, body: new TextEncoder().encode(body) });
+}
+
+async function withLogs(fn) {
+  const lines = [];
+  const methods = ["log", "info", "warn", "error", "debug", "trace"];
+  const originals = Object.fromEntries(methods.map((m) => [m, console[m]]));
+  for (const m of methods) console[m] = (...a) => lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+  try { return { result: await fn(), lines }; } finally { for (const m of methods) console[m] = originals[m]; }
+}
+
+const BOUNDARY = "----rigtestboundary7MA4YWxkTrZu0gW";
+const part = (name, value, extra = "") => `--${BOUNDARY}\r\nContent-Disposition: form-data; name="${name}"${extra}\r\n\r\n${value}\r\n`;
+const multipart = (fields) => Object.entries(fields).map(([k, v]) => part(k, v)).join("");
+
+test("every field at its cap in CJK fits the body cap on the no-JS (url-encoded) path", async () => {
+  const cjk = (n) => "漢".repeat(n);
+  const email = (n) => "あ".repeat(n - "@example.com".length) + "@example.com";
+  const cases = [
+    { ...PRIVATE, name: cjk(200), email: email(254), whatsapp: "＋".repeat(40), message: cjk(5000) },
+    { ...PARTNER, name: cjk(200), position: cjk(200), organisation: cjk(200), country: cjk(200), email: email(254), message: cjk(5000) },
+  ];
+  for (const fields of cases) {
+    const bytes = new URLSearchParams(fields).toString().length;
+    assert.ok(bytes > 45000, `worst case really is large (${bytes} bytes)`);
+    const f = fakeFetch();
+    const res = await handle(formRequest(fields, { json: false, encoding: "urlencoded" }), ENV, f);
+    assert.equal(res.status, 303, `${fields.form}: ${bytes} bytes`);
+    assert.equal(res.headers.get("location"), "/thanks.html", `${fields.form}: ${bytes} bytes`);
+    assert.equal(f.calls.length, 1);
+    assert.ok(f.calls[0].body.text.endsWith(cjk(5000)));
+  }
+  // and a plain 5000-character CJK message, no-JS and JS
+  for (const opts of [{ json: false, encoding: "urlencoded" }, { json: true, encoding: "multipart" }]) {
+    const f = fakeFetch();
+    const res = await handle(formRequest({ ...PRIVATE, message: cjk(5000) }, opts), ENV, f);
+    assert.ok(res.status === 200 || (res.status === 303 && res.headers.get("location") === "/thanks.html"), JSON.stringify(opts));
+    assert.equal(f.calls.length, 1, JSON.stringify(opts));
+  }
+});
+
+test("textarea line breaks (sent as CRLF) count as one character, as maxlength does", async () => {
+  // 50 lines of 99 characters: 4999 characters in the browser, 5048 if each CRLF counted twice
+  const message = Array(50).fill("a".repeat(99)).join("\r\n");
+  assert.equal(message.replace(/\r\n/g, "\n").length, 4999);
+  for (const encoding of ["multipart", "urlencoded"]) {
+    const f = fakeFetch();
+    const res = await handle(formRequest({ ...PRIVATE, message }, { encoding }), ENV, f);
+    assert.equal(res.status, 200, encoding);
+    assert.doesNotMatch(f.calls[0].body.text, /\r/);
+  }
+  // two characters more (line break + 1) is over the cap and still refused
+  const over = await handle(formRequest({ ...PRIVATE, message: message + "\r\nb" }), ENV, fakeFetch());
+  assert.equal(over.status, 400);
+});
+
+test("duplicate fields: the first value wins, consistently", async () => {
+  // form type
+  let f = fakeFetch();
+  let res = await handle(rawRequest(multipart(PRIVATE) + part("form", "partner-enquiry") + `--${BOUNDARY}--\r\n`, `multipart/form-data; boundary=${BOUNDARY}`), ENV, f);
+  assert.equal(res.status, 200);
+  assert.equal(f.calls[0].body.subject, "[Website] Private enquiry — Aisha Rahman");
+  // email (reply_to) and name
+  f = fakeFetch();
+  res = await handle(rawRequest(multipart(PRIVATE) + part("email", "second@example.com") + part("name", "Second") + `--${BOUNDARY}--\r\n`, `multipart/form-data; boundary=${BOUNDARY}`), ENV, f);
+  assert.equal(res.status, 200);
+  assert.equal(f.calls[0].body.reply_to, PRIVATE.email);
+  assert.ok(!f.calls[0].body.text.includes("Second"));
+  // consent "no" then "yes" → refused (first wins), url-encoded too
+  const { consent, ...noConsent } = PRIVATE;
+  for (const [body, type] of [
+    [multipart(noConsent) + part("consent", "no") + part("consent", "yes") + `--${BOUNDARY}--\r\n`, `multipart/form-data; boundary=${BOUNDARY}`],
+    [new URLSearchParams(noConsent).toString() + "&consent=no&consent=yes", "application/x-www-form-urlencoded"],
+  ]) {
+    f = fakeFetch();
+    res = await handle(rawRequest(body, type), ENV, f);
+    assert.equal(res.status, 400, type);
+    assert.equal(f.calls.length, 0);
+  }
+  // honeypot filled then empty → still treated as spam, nothing sent
+  f = fakeFetch();
+  const { [HONEYPOT_FIELD]: hp, ...noHp } = PRIVATE;
+  res = await handle(rawRequest(new URLSearchParams(noHp).toString() + `&${HONEYPOT_FIELD}=spam&${HONEYPOT_FIELD}=`, "application/x-www-form-urlencoded"), ENV, f);
+  assert.equal(res.status, 200);
+  assert.equal(f.calls.length, 0);
+});
+
+test("a file upload part is refused (400 / error page), never skipped and sent", async () => {
+  const file = part("attachment", "%PDF-1.4 fake", `; filename="scan.pdf"\r\nContent-Type: application/pdf`);
+  for (const json of [true, false]) {
+    const f = fakeFetch();
+    const { result: res, lines } = await withLogs(() => handle(rawRequest(multipart(PRIVATE) + file + `--${BOUNDARY}--\r\n`, `multipart/form-data; boundary=${BOUNDARY}`, { json }), ENV, f));
+    if (json) {
+      assert.equal(res.status, 400);
+      assert.deepEqual(await json_(res), { ok: false, error: "invalid" });
+    } else {
+      assert.equal(res.status, 303);
+      assert.equal(res.headers.get("location"), "/enquiry-error.html");
+    }
+    assert.equal(f.calls.length, 0);
+    assert.deepEqual(lines.map((l) => JSON.parse(l)), [{ fn: "enquiry", form: "unknown", outcome: "file_upload", status: 400 }]);
+  }
+});
+
+test("malformed multipart and a missing content-type → generic 400, no crash, nothing sent, no PII logged", async () => {
+  const mp = `multipart/form-data; boundary=${BOUNDARY}`;
+  const good = multipart(PRIVATE);
+  const cases = [
+    ["garbage body", "this is not multipart " + PRIVATE.email, mp, "bad_body"],
+    ["missing closing boundary", good, mp, "bad_body"],
+    ["truncated mid-part", good + `--${BOUNDARY}\r\nContent-Disposition: form-data; name="message"\r\n\r\n${PRIVATE.message}`, mp, "bad_body"],
+    ["wrong boundary", good + `--${BOUNDARY}--\r\n`, "multipart/form-data; boundary=----other", "bad_body"],
+    ["no boundary parameter", good + `--${BOUNDARY}--\r\n`, "multipart/form-data", "bad_body"],
+    ["missing content-type", new URLSearchParams(PRIVATE).toString(), null, "bad_content_type"],
+    ["text/plain", new URLSearchParams(PRIVATE).toString(), "text/plain", "bad_content_type"],
+  ];
+  for (const [label, body, type, outcome] of cases) {
+    for (const json of [true, false]) {
+      const f = fakeFetch();
+      const { result: res, lines } = await withLogs(() => handle(rawRequest(body, type, { json }), ENV, f));
+      if (json) {
+        assert.equal(res.status, 400, label);
+        assert.deepEqual(await json_(res), { ok: false, error: "invalid" }, label);
+      } else {
+        assert.equal(res.status, 303, label);
+        assert.equal(res.headers.get("location"), "/enquiry-error.html", label);
+      }
+      assert.equal(f.calls.length, 0, label);
+      assert.deepEqual(lines.map((l) => JSON.parse(l)), [{ fn: "enquiry", form: "unknown", outcome, status: 400 }], label);
+      const all = lines.join("\n");
+      for (const pii of [PRIVATE.name, PRIVATE.email, PRIVATE.whatsapp, PRIVATE.message.slice(0, 20)]) assert.ok(!all.includes(pii), `${label}: log leaked ${pii}`);
+    }
+  }
+});
+
+async function json_(res) { return JSON.parse(await res.text()); }
 
 // ---------- privacy ----------
 

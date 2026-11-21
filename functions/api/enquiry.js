@@ -14,12 +14,16 @@
  * code. Never names, emails, phones, messages or IP addresses.
  */
 
-export const MAX_BODY_BYTES = 32 * 1024;
-
 export const LIMITS = {
   name: 200, position: 200, organisation: 200, country: 200,
   email: 254, whatsapp: 40, message: 5000,
 };
+
+/* Body cap. LIMITS count UTF-16 code units (as the markup's maxlength does). The no-JS
+ * path sends application/x-www-form-urlencoded, where one BMP character (e.g. CJK) costs
+ * up to 9 bytes (%XX%XX%XX). Every field of either form at its cap in such characters is
+ * about 54 KB, so 64 KB never refuses a submission the form allows. */
+export const MAX_BODY_BYTES = 64 * 1024;
 
 export const FORMS = {
   "private-enquiry": {
@@ -146,7 +150,8 @@ async function parseForm(request) {
 function validate(spec, data) {
   const clean = {};
   for (const field of [...spec.required, ...spec.optional]) {
-    const value = typeof data[field] === "string" ? data[field].trim() : "";
+    // Browsers submit textarea line breaks as CRLF but maxlength counts each as one character.
+    const value = typeof data[field] === "string" ? data[field].replace(/\r\n?/g, "\n").trim() : "";
     if (value.length > LIMITS[field]) throw new HttpError(400, "too_long");
     if (!value && spec.required.includes(field)) throw new HttpError(400, "missing_field");
     clean[field] = value;

@@ -27,8 +27,12 @@
 /assets/js/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
-# R1: the production *.pages.dev hostname must not be indexed (regenig.com is the canonical
-# site and stays indexable). Absolute-URL rule: it matches only requests whose host is
-# <project>.pages.dev, never regenig.com or www. ":project" matches any project name.
+# R1: the production *.pages.dev hostnames must not be indexed (regenig.com is the canonical
+# site and stays indexable). Absolute-URL rules: they match only requests whose host is
+# <project>.pages.dev, or <hash>.<project>.pages.dev (the unique URL of every deployment),
+# never regenig.com or www. Each ":placeholder" matches one host label.
 https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
   X-Robots-Tag: noindex

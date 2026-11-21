@@ -316,6 +316,26 @@ for (const vp of VIEWPORTS) {
       check(`${id}: focus visible (≥2px) on inputs/textarea/checkbox`, badControls.length === 0 && controlsSeen.size >= controls.length, badControls.slice(0, 5).join(" | "));
     }
     check(`${id}: honeypot never receives keyboard focus`, !hpFocused);
+    // review C2-5 (X8): the 2px focus underline must not move anything (padding gives back the extra px)
+    if (controls.length) {
+      const shifts = await page.evaluate(async () => {
+        const settle = (el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {})));
+        const out = [];
+        for (const el of document.querySelectorAll(".field input, .field textarea")) {
+          if (el.closest("[aria-hidden=true]")) continue;
+          const field = el.closest(".field"), next = field.nextElementSibling;
+          const measure = () => [el.getBoundingClientRect().height, next ? next.getBoundingClientRect().top - field.getBoundingClientRect().top : 0];
+          el.blur(); await settle(el);
+          const rest = measure();
+          el.focus({ preventScroll: true }); await settle(el);
+          const focused = measure();
+          el.blur();
+          if (Math.abs(rest[0] - focused[0]) > 0.01 || Math.abs(rest[1] - focused[1]) > 0.01) out.push(`#${el.id} h ${rest[0]}→${focused[0]} next ${rest[1]}→${focused[1]}`);
+        }
+        return out;
+      });
+      check(`${id}: focusing a field moves nothing (height + next field unchanged)`, shifts.length === 0, shifts.slice(0, 3).join(" | "));
+    }
 
     await page.evaluate(() => { document.activeElement && document.activeElement.blur(); window.scrollTo({ top: 0, behavior: "instant" }); });
     await page.waitForTimeout(100);

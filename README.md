@@ -43,7 +43,8 @@ Menu: Home · About · Partners · Enquire, plus language switcher (EN live; 中
   `Accept: application/json` and shows the outcome inline; without JS the browser gets a 303 to `thanks.html`
   or `enquiry-error.html`. `functions/api/enquiry.js` validates (required fields, length caps, email shape,
   consent), drops spam silently (honeypot field `website`), checks `Origin` against `ALLOWED_ORIGINS`, caps the
-  body at 32 KB, and sends a plain-text email through the Resend API to `MAIL_TO` with `Reply-To` set to the
+  body at 64 KB (room for every field at its cap in CJK text on the no-JS path; the markup's `maxlength` mirrors
+  the per-field caps), and sends a plain-text email through the Resend API to `MAIL_TO` with `Reply-To` set to the
   enquirer. Env vars on the Pages project: `RESEND_API_KEY` (secret), `MAIL_TO`, `MAIL_FROM`, `ALLOWED_ORIGINS`.
   Until they are set it answers 503 and visitors are told to write to info@regenig.com; nothing is silently
   dropped. It logs only form type, outcome and status code, never personal data.
@@ -87,7 +88,8 @@ Still open (owners):
   root (site files only; `functions/` is compiled from the root). Custom domains `regenig.com` (canonical) and
   `www.regenig.com` (301 → apex). Exact steps, env vars, DNS order and rollback: [`docs/LAUNCH-RUNBOOK.md`](docs/LAUNCH-RUNBOOK.md).
 - **Preview:** `regenig-preview.vercel.app` (Vercel), `noindex` added at deploy time by a `vercel.json` outside this
-  repo. Do not add a site-wide `noindex` to the repo: the only one in `_headers` is the host-scoped
-  `https://:project.pages.dev/*` rule, so the production `*.pages.dev` address is never indexed while regenig.com is.
+  repo. Do not add a site-wide `noindex` to the repo: the only ones in `_headers` are the host-scoped
+  `https://:project.pages.dev/*` and `https://:version.:project.pages.dev/*` rules, so the production
+  `*.pages.dev` addresses (including each deployment's own URL) are never indexed while regenig.com is.
 - **v1 (GitHub Pages, push to `main`)** retires at cutover: unpublish it in the GitHub repo settings once regenig.com
   serves v2, and retire or noindex the `rig-website-five.vercel.app` alias.

@@ -8,7 +8,7 @@ export const REAL_PAGES = {
   "privacy.html": `${SITE}/privacy`,
   "disclaimer.html": `${SITE}/disclaimer`,
 };
-export const STATUS_PAGES = ["thanks.html", "enquiry-error.html", "404.html"];
+export const STATUS_PAGES = ["thanks.html", "enquiry-error.html", "enquiry-too-long.html", "404.html"];
 export const STUBS = ["services.html", "process.html", "network.html", "team.html", "contact.html"];
 
 export const REQUIRED_CSP = {

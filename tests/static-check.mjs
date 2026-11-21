@@ -279,11 +279,16 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
       check(`${file}: required field "${f}" present + required`, el && "required" in el);
     }
     for (const f of spec.optional) check(`${file}: optional field "${f}" present`, !!named(f));
-    // review C2-4: the browser stops at the server's cap, so a long entry is never refused after typing
-    for (const f of [...spec.required, ...spec.optional]) {
+    // review C2-4: short fields stop at the server's cap, so a long entry is never refused after typing
+    for (const f of [...spec.required, ...spec.optional].filter((x) => x !== "message")) {
       const el = named(f);
       check(`${file}: ${f} maxlength = server cap ${fn.LIMITS[f]}`, el && el.maxlength === String(fn.LIMITS[f]), el && el.maxlength);
     }
+    // ruling R2 (review C3-1): the message is never cut off silently. No maxlength; site.js counts
+    // against data-maxchars, which must be the server's cap.
+    const msgEl = named("message");
+    check(`${file}: message has no maxlength (no silent truncation)`, msgEl && !("maxlength" in msgEl), msgEl && msgEl.maxlength);
+    check(`${file}: message data-maxchars = server cap ${fn.LIMITS.message}`, msgEl && msgEl["data-maxchars"] === String(fn.LIMITS.message), msgEl && msgEl["data-maxchars"]);
     const consent = named("consent");
     check(`${file}: consent checkbox required, value=yes`, consent && consent.type === "checkbox" && "required" in consent && consent.value === "yes");
     const extraFields = [...tags(html, "input"), ...tags(html, "textarea")].map((t) => t.name).filter(Boolean)
@@ -300,6 +305,15 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
       check(`${file}: honeypot wrapper aria-hidden + .hp`, w["aria-hidden"] === "true" && /\bhp\b/.test(w.class || ""));
     }
   }
+  // ruling R2: the no-JS outcome pages the function redirects to exist; the too-long page names the limit
+  for (const [k, loc] of Object.entries(fn.PAGES)) check(`function page ${k} → ${loc} exists`, existsSync(join(ROOT, loc.slice(1))));
+  const limitText = `${fn.LIMITS.message.toLocaleString("en-US")} characters`;
+  const tooLong = pages[(fn.PAGES.tooLong || "").slice(1)] || "";
+  check(`too-long page says messages are limited to ${limitText}`, new RegExp(`Messages are limited to ${limitText}`).test(tooLong));
+  check("too-long page offers info@regenig.com", /<main[\s\S]*href="mailto:info@regenig\.com"[\s\S]*<\/main>/.test(tooLong));
+  const siteJs = read("assets/js/site.js");
+  check("site.js: message counter reads data-maxchars", /textarea\[data-maxchars\]/.test(siteJs) && /getAttribute\("data-maxchars"\)/.test(siteJs));
+  check("site.js: counter is announced politely", /setAttribute\("aria-live", "polite"\)/.test(siteJs));
   const css = read("assets/css/style.css");
   const hpRule = (css.match(/\.hp\s*\{([^}]*)\}/) || [])[1] || "";
   check("style.css: .hp is visually hidden", /position:\s*absolute/.test(hpRule) && /(clip-path|clip)\s*:/.test(hpRule));
@@ -349,6 +363,13 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   for (const rec of ["_dmarc", "resend._domainkey.send", "send.send"]) check(`runbook §5 rollback: re-add Cloudflare-only record ${rec}`, s5.includes(`\`${rec}\``));
   check("runbook: ALLOWED_ORIGINS uses <project>.pages.dev", /\| `ALLOWED_ORIGINS` \|[^\n]*https:\/\/<project>\.pages\.dev/.test(rb));
   check("runbook: no hard-coded regenig.pages.dev / --project-name regenig", !/regenig\.pages\.dev|--project-name regenig\b/.test(rb));
+}
+
+// ---------- ruling R3: Choo's RIG address is youngmin@regenig.com ----------
+{
+  const files = ["README.md", "assets/team/README.md", ...readdirSync(join(ROOT, "docs")).map((f) => `docs/${f}`), ...htmlFiles];
+  const stale = files.filter((f) => /\bchoo@regenig\.com\b|\(or choo@\)/i.test(read(f)));
+  check("R3: no choo@regenig.com left in docs, README or pages (use youngmin@regenig.com)", stale.length === 0, stale.join(", "));
 }
 
 // ---------- report ----------

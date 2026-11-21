@@ -18,7 +18,7 @@ a Squarespace "Coming Soon" page on Squarespace DNS; the switch is in [`docs/LAU
 | `privacy.html` | All | **Draft** Privacy Policy v0.1, pending Luqman's review (blanks in brackets) |
 | `disclaimer.html` | All | **Interim** text (v1 notice adapted) — final text to be supplied |
 | `services/process/network/team/contact.html` | — | v1 URLs kept as redirect stubs to their new homes (also 301s in `_redirects`) |
-| `thanks.html` · `enquiry-error.html` · `404.html` | — | Form outcome pages (no-JS path) and the not-found page; `noindex` |
+| `thanks.html` · `enquiry-error.html` · `enquiry-too-long.html` · `404.html` | — | Form outcome pages (no-JS path) and the not-found page; `noindex` |
 | `functions/api/enquiry.js` | — | Cloudflare Pages Function behind both forms (`POST /api/enquiry`) |
 | `_headers` · `_redirects` · `robots.txt` · `sitemap.xml` | — | Cloudflare Pages config (CSP, HSTS, caching; v1 301s) and crawler files |
 
@@ -43,11 +43,17 @@ Menu: Home · About · Partners · Enquire, plus language switcher (EN live; 中
   `Accept: application/json` and shows the outcome inline; without JS the browser gets a 303 to `thanks.html`
   or `enquiry-error.html`. `functions/api/enquiry.js` validates (required fields, length caps, email shape,
   consent), drops spam silently (honeypot field `website`), checks `Origin` against `ALLOWED_ORIGINS`, caps the
-  body at 64 KB (room for every field at its cap in CJK text on the no-JS path; the markup's `maxlength` mirrors
-  the per-field caps), and sends a plain-text email through the Resend API to `MAIL_TO` with `Reply-To` set to the
+  body at 64 KB (room for every field at its cap in CJK text on the no-JS path; the short fields' `maxlength`
+  mirrors the per-field caps), and sends a plain-text email through the Resend API to `MAIL_TO` with `Reply-To` set to the
   enquirer. Env vars on the Pages project: `RESEND_API_KEY` (secret), `MAIL_TO`, `MAIL_FROM`, `ALLOWED_ORIGINS`.
   Until they are set it answers 503 and visitors are told to write to info@regenig.com; nothing is silently
   dropped. It logs only form type, outcome and status code, never personal data.
+- **Message limit (5,000 characters):** the message has no `maxlength`, so nothing is cut off silently.
+  `site.js` shows a live count under it (`data-maxchars`, announced politely only near or over the limit) and
+  blocks an over-long submit with an inline status, keeping the text. Without JS the function refuses it (400,
+  logged `message_too_long`) and the browser lands on `enquiry-too-long.html`, which names the limit and offers
+  info@regenig.com. Line breaks count as one character on both sides (`countChars` in `site.js` and the function
+  must stay identical; a unit test compares them).
 - **Imagery:** `scripts/gen_images.py` (local ComfyUI + Z-Image Turbo) holds the prompts; Japan, light, texture, calm — no labs, needles or clinical stock.
 
 ## Team photos
@@ -73,7 +79,7 @@ Done in the launch-prep lane:
 
 Still open (owners):
 - [ ] Luqman OK on softened copy (`COPY:` comments) and colour direction
-- [ ] Luqman: Workspace seat `choo@regenig.com`; Squarespace domain-manager invite for regenig.com
+- [ ] Luqman: Workspace seat `youngmin@regenig.com`; Squarespace domain-manager invite for regenig.com
 - [ ] Cloudflare account + Pages project + env vars; Resend account + `send.regenig.com` verified (runbook 1–4c)
 - [ ] Processor agreements (Cloudflare, Resend DPA) and both named in the Privacy Policy
 - [ ] Final Privacy Policy (draft v0.1 in place) + Disclaimer text (replace interim notice)

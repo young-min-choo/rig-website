@@ -33,6 +33,7 @@ const PAGES = [
   ["disclaimer", "/disclaimer.html"],
   ["thanks", "/thanks.html"],
   ["enquiry-error", "/enquiry-error.html"],
+  ["enquiry-too-long", "/enquiry-too-long.html"],
   ["404", "/no/such/page"],
 ];
 const STUBS = [
@@ -408,6 +409,75 @@ for (const vp of VIEWPORTS) {
     check(`${id}: no unexpected console errors`, errs.length === 0 && log.pageErrors.length === 0, errs.join(" | "));
     check(`${id}: no CSP violations`, (await page.evaluate(() => window.__csp)).length === 0);
     await page.screenshot({ path: join(SHOTS, `form-${type}-${tag}.png`) });
+
+    // ruling R2 (review C3-1): live count, no silent truncation, over-limit submit blocked with the text kept
+    {
+      const msgSel = `#${prefix}-msg`;
+      const num = page.locator(`#${prefix}-msg-count > span:first-child`);
+      const liveText = () => page.evaluate(() => document.querySelector("form [data-count-live]").textContent);
+      const settle = () => page.waitForTimeout(900); // the live region updates 700 ms after typing stops
+      check(`${id}: message has no maxlength`, (await page.getAttribute(msgSel, "maxlength")) === null);
+      const wiring = await page.evaluate((p) => {
+        const ta = document.getElementById(`${p}-msg`), c = document.getElementById(`${p}-msg-count`);
+        const l = document.querySelector("form [data-count-live]");
+        if (!c || !l) return null;
+        const r = c.getBoundingClientRect(), t = ta.getBoundingClientRect();
+        return { described: (ta.getAttribute("aria-describedby") || "").split(/\s+/).includes(c.id), live: l.getAttribute("aria-live"),
+          countLive: c.getAttribute("aria-live"), visible: r.height > 4 && r.width > 4, below: r.top >= t.bottom - 0.5 };
+      }, prefix);
+      check(`${id}: counter present, under the message, in its description`, !!wiring && wiring.visible && wiring.below && wiring.described, JSON.stringify(wiring));
+      check(`${id}: count announced through a polite live region (the visible count itself is not live)`, !!wiring && wiring.live === "polite" && wiring.countLive === null, JSON.stringify(wiring));
+
+      await page.fill(msgSel, "Short note.");
+      await settle();
+      check(`${id}: counter counts live ("11 / 5,000")`, (await num.textContent()) === "11 / 5,000", await num.textContent());
+      check(`${id}: nothing announced far below the limit`, (await liveText()) === "", await liveText());
+      await page.fill(msgSel, "n".repeat(4600));
+      await settle();
+      check(`${id}: near the limit the remaining count is announced`, (await liveText()) === "400 characters left.", await liveText());
+
+      const long = "a".repeat(6000);
+      await page.fill(msgSel, long);
+      check(`${id}: a 6,000-character paste is kept whole (no silent truncation)`, (await page.inputValue(msgSel)).length === 6000, String((await page.inputValue(msgSel)).length));
+      check(`${id}: counter shows "6,000 / 5,000" in the over state`, (await num.textContent()) === "6,000 / 5,000" &&
+        (await page.getAttribute(`#${prefix}-msg-count`, "class")).includes("is-over") && (await page.getAttribute(msgSel, "aria-invalid")) === "true",
+        await num.textContent());
+      await waitOrFail(`${id}: over-limit count announced`, () => page.waitForFunction(() =>
+        document.querySelector("form [data-count-live]").textContent === "Your message is 1,000 characters over the limit of 5,000.", null, { timeout: 3000 }));
+      const over = await page.evaluate(pageProbe, MIN_CONTRAST);
+      check(`${id}: contrast ≥ ${MIN_CONTRAST}:1 with the counter in its over state`, over.contrast.low.length === 0, over.contrast.low.slice(0, 4).join(" | "));
+      check(`${id}: no overflow with the counter in its over state`, over.overflow <= 0, `${over.overflow}px`);
+
+      for (const [k, v] of Object.entries(fields)) if (k !== "msg") await page.fill(`#${prefix}-${k}`, v);
+      await page.check(`#${prefix}-consent`);
+      const hits = apiHits.length, mails = upstream.calls.length;
+      await page.locator("form button[type=submit]").click();
+      await page.waitForTimeout(300);
+      const st = await status.textContent();
+      check(`${id}: over-limit submit is blocked with a clear status`, st === "Messages are limited to 5,000 characters. Please shorten yours by 1,000, or write to info@regenig.com.", st);
+      check(`${id}: over-limit submit sends nothing`, apiHits.length === hits && upstream.calls.length === mails, `${apiHits.length - hits} requests`);
+      check(`${id}: over-limit submit keeps the text and returns focus to it`, (await page.inputValue(msgSel)) === long &&
+        (await page.evaluate(() => document.activeElement && document.activeElement.id)) === `${prefix}-msg`);
+      await page.screenshot({ path: join(SHOTS, `form-${type}-over-${tag}.png`) });
+
+      // exactly at the limit, with line breaks the browser submits as CRLF: the counter and the server agree
+      const at = Array(10).fill("a".repeat(499)).join("\n") + "a";
+      await page.fill(msgSel, at + "b");
+      await page.locator("form button[type=submit]").click();
+      await page.waitForTimeout(200);
+      check(`${id}: 5,001 characters (with line breaks) are blocked "by 1"`, /shorten yours by 1,/.test(await status.textContent()) && apiHits.length === hits, await status.textContent());
+      await page.fill(msgSel, at);
+      check(`${id}: 5,000 characters with 9 line breaks count as "5,000 / 5,000"`, (await num.textContent()) === "5,000 / 5,000" &&
+        !(await page.getAttribute(`#${prefix}-msg-count`, "class")).includes("is-over"), await num.textContent());
+      await page.locator("form button[type=submit]").click();
+      await waitOrFail(`${id}: at-limit submit settles within 5 s`, () => page.waitForFunction(() => /Thank you|could not|limited/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 }));
+      const atMail = upstream.calls[mails];
+      check(`${id}: the server accepts what the counter allows (delivered once, message whole)`, /Thank you/.test(await status.textContent()) &&
+        upstream.calls.length === mails + 1 && !!atMail && atMail.text.endsWith(at), await status.textContent());
+      await page.waitForTimeout(50);
+      check(`${id}: counter back to "0 / 5,000" after the form resets`, (await num.textContent()) === "0 / 5,000", await num.textContent());
+      check(`${id}: no CSP violations or errors around the counter`, (await page.evaluate(() => window.__csp)).length === 0 && log.pageErrors.length === 0, log.pageErrors.join(" | "));
+    }
     await page.close();
   }
 
@@ -438,6 +508,26 @@ for (const vp of VIEWPORTS) {
     await Promise.all([page.waitForURL(`**${expect}`, { timeout: 5000 }).catch(() => {}), page.click("form button[type=submit]")]);
     check(`no-JS partner submit (upstream ${mode}) → ${expect}`, new URL(page.url()).pathname === expect, page.url());
     check(`no-JS partner submit (upstream ${mode}): no third-party requests`, foreign(ext).length === 0);
+    await page.close();
+  }
+  // ruling R2: without JS an over-long message is not cut off; the server refuses it and the page names the limit
+  {
+    const page = await context.newPage();
+    await page.goto(ORIGIN + "/partners.html");
+    for (const [k, v] of Object.entries({ name: "NoJS", pos: "Lead", org: "NoJS Org", country: "Japan", email: "nojs@example.com", msg: "b".repeat(6000) })) {
+      await page.fill(`#pf-${k}`, v);
+    }
+    await page.check("#pf-consent");
+    check("no-JS: a 6,000-character message is kept whole", (await page.inputValue("#pf-msg")).length === 6000);
+    const sent = upstream.calls.length;
+    upstream.status = 200;
+    await Promise.all([page.waitForURL("**/enquiry-too-long.html", { timeout: 5000 }).catch(() => {}), page.click("form button[type=submit]")]);
+    check("no-JS over-limit submit → /enquiry-too-long.html", new URL(page.url()).pathname === "/enquiry-too-long.html", page.url());
+    check("no-JS over-limit submit: refused by the server (303 to the limit page), nothing delivered", upstream.calls.length === sent && apiHits[apiHits.length - 1].status === 303);
+    const body = await page.locator("main").innerText();
+    check("no-JS too-long page says messages are limited to 5,000 characters", /Messages are limited to 5,000 characters/.test(body), body.slice(0, 120));
+    check("no-JS too-long page offers info@regenig.com", (await page.locator('main a[href="mailto:info@regenig.com"]').count()) === 1);
+    await page.screenshot({ path: join(SHOTS, "nojs-too-long-390.png"), fullPage: true });
     await page.close();
   }
   // missing consent without JS → error page, nothing delivered

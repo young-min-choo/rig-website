@@ -2,7 +2,8 @@
 // Never touches the network: every test injects a fake fetch.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { handle, onRequestPost, MAX_BODY_BYTES, HONEYPOT_FIELD } from "../functions/api/enquiry.js";
+import { readFileSync } from "node:fs";
+import { handle, onRequestPost, MAX_BODY_BYTES, HONEYPOT_FIELD, LIMITS, PAGES, countChars } from "../functions/api/enquiry.js";
 
 // The function's single outcome line per request is noise here; tests that
 // inspect logging install their own capture.
@@ -365,7 +366,7 @@ test("no-JS failures → 303 /enquiry-error.html", async () => {
     [formRequest(PRIVATE, { json: false, origin: "https://evil.example" }), ENV, fakeFetch()],
     [formRequest(PRIVATE, { json: false }), ENV, fakeFetch(500)],
     [formRequest(PRIVATE, { json: false }), { ...ENV, RESEND_API_KEY: "" }, fakeFetch()],
-    [formRequest({ ...PRIVATE, message: "z".repeat(MAX_BODY_BYTES) }, { json: false }), ENV, fakeFetch()],
+    [formRequest({ ...PRIVATE, name: "n".repeat(201) }, { json: false }), ENV, fakeFetch()],
   ];
   for (const [req, env, f] of cases) {
     const res = await handle(req, env, f);
@@ -558,4 +559,71 @@ test("no PII is ever logged (console capture across every path)", async () => {
     assert.deepEqual(Object.keys(parsed).sort(), ["fn", "form", "outcome", "status"]);
     assert.ok(["private-enquiry", "partner-enquiry", "unknown"].includes(parsed.form));
   }
+});
+
+// ---------- ruling R2 (review C3-1): message limit, no silent truncation ----------
+
+test("over-limit message: JSON 400 message_too_long; no-JS 303 to the page that names the limit; nothing sent", async () => {
+  assert.equal(PAGES.tooLong, "/enquiry-too-long.html");
+  const over = "m".repeat(LIMITS.message + 1);
+  for (const base of [PRIVATE, PARTNER]) {
+    const f = fakeFetch();
+    const { result: res, lines } = await withLogs(() => handle(formRequest({ ...base, message: over }), ENV, f));
+    assert.equal(res.status, 400);
+    assert.deepEqual(await json(res), { ok: false, error: "message_too_long" });
+    assert.deepEqual(JSON.parse(lines[0]), { fn: "enquiry", form: base.form, outcome: "message_too_long", status: 400 });
+    for (const encoding of ["urlencoded", "multipart"]) {
+      const g = fakeFetch();
+      const { result: nojs, lines: l2 } = await withLogs(() => handle(formRequest({ ...base, message: over }, { json: false, encoding }), ENV, g));
+      assert.equal(nojs.status, 303, encoding);
+      assert.equal(nojs.headers.get("location"), "/enquiry-too-long.html", encoding);
+      assert.equal(JSON.parse(l2[0]).status, 400, "the refusal is a 400");
+      assert.equal(f.calls.length + g.calls.length, 0);
+    }
+  }
+  // a paste so long that the body passes the cap is the same mistake: same page, nothing sent
+  const big = fakeFetch();
+  const huge = await handle(formRequest({ ...PRIVATE, message: "z".repeat(MAX_BODY_BYTES) }, { json: false, encoding: "urlencoded" }), ENV, big);
+  assert.equal(huge.headers.get("location"), "/enquiry-too-long.html");
+  const hugeJson = await handle(formRequest({ ...PRIVATE, message: "z".repeat(MAX_BODY_BYTES) }), ENV, big);
+  assert.deepEqual([hugeJson.status, (await json(hugeJson)).error], [413, "too_large"]);
+  assert.equal(big.calls.length, 0);
+  // other over-long fields (only scripts can send them: they keep maxlength) stay generic
+  const name = await handle(formRequest({ ...PRIVATE, name: "n".repeat(201) }), ENV, fakeFetch());
+  assert.deepEqual(await json(name), { ok: false, error: "invalid" });
+  const nameNoJs = await handle(formRequest({ ...PRIVATE, name: "n".repeat(201) }, { json: false }), ENV, fakeFetch());
+  assert.equal(nameNoJs.headers.get("location"), "/enquiry-error.html");
+});
+
+test("the message limit is exact: 5,000 characters with CRLF line breaks pass, 5,001 do not", async () => {
+  // 9 line breaks, sent as CRLF by the browser: 5,000 characters, 5,009 if CRLF counted twice
+  const at = Array(10).fill("a".repeat(499)).join("\r\n") + "a";
+  assert.equal(countChars(at), 5000);
+  for (const encoding of ["multipart", "urlencoded"]) {
+    const f = fakeFetch();
+    const ok = await handle(formRequest({ ...PRIVATE, message: at }, { encoding }), ENV, f);
+    assert.equal(ok.status, 200, encoding);
+    assert.equal(f.calls.length, 1);
+    const tooMany = await handle(formRequest({ ...PRIVATE, message: at + "b" }, { encoding }), ENV, fakeFetch());
+    assert.equal(tooMany.status, 400, encoding);
+  }
+});
+
+test("site.js counts exactly like the server (CRLF and lone CR are one character, ends trimmed)", () => {
+  const src = readFileSync(new URL("../assets/js/site.js", import.meta.url), "utf8");
+  const m = src.match(/function countChars\(v\) \{([^\n]*)\}\n/);
+  assert.ok(m, "site.js defines countChars(v) on one line");
+  const clientCount = new Function("v", m[1]);
+  const corpus = [
+    "", "a", "a\r\nb", "a\nb", "a\rb", "\r\n\r\n", "  padded  \r\n", "\r\nlead", "tail\r\n",
+    "😀 surrogate pair", "漢字\r\nかな", "a\u2028b", "a\u00a0b", "\t tabs \t",
+    Array(10).fill("a".repeat(499)).join("\r\n") + "a",
+    Array(10).fill("a".repeat(499)).join("\n") + "a",
+    "x".repeat(5001),
+  ];
+  for (const v of corpus) assert.equal(clientCount(v), countChars(v), JSON.stringify(v.slice(0, 20)));
+  assert.equal(clientCount("a\r\nb"), 3, "CRLF counts as one");
+  assert.equal(clientCount(Array(10).fill("a".repeat(499)).join("\r\n") + "a"), 5000);
+  // and the counter's limit is the server's (the markup carries it; static-check pins the markup)
+  assert.match(src, /getAttribute\("data-maxchars"\)/);
 });

@@ -19,10 +19,13 @@ export const LIMITS = {
   email: 254, whatsapp: 40, message: 5000,
 };
 
-/* Body cap. LIMITS count UTF-16 code units (as the markup's maxlength does). The no-JS
- * path sends application/x-www-form-urlencoded, where one BMP character (e.g. CJK) costs
- * up to 9 bytes (%XX%XX%XX). Every field of either form at its cap in such characters is
- * about 54 KB, so 64 KB never refuses a submission the form allows. */
+/* Body cap. LIMITS count UTF-16 code units (as maxlength and the message counter in
+ * assets/js/site.js do). The no-JS path sends application/x-www-form-urlencoded, where one
+ * BMP character (e.g. CJK) costs up to 9 bytes (%XX%XX%XX). Every field of either form at
+ * its cap in such characters is about 54 KB, so 64 KB never refuses a submission the form
+ * allows. The message has no maxlength (no silent truncation, ruling R2): a longer one is
+ * refused with its own page, and so is a body over the cap, which only a long message can
+ * cause from the real forms. */
 export const MAX_BODY_BYTES = 64 * 1024;
 
 export const FORMS = {
@@ -43,6 +46,24 @@ export const FORMS = {
 export const HONEYPOT_FIELD = "website";
 const EMAIL_RE = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/;
 const CONSENT_VALUES = new Set(["yes", "on", "true"]);
+
+/* Where the no-JS path lands. A message over its limit (or a body over the cap) gets a
+ * page that names the limit; every other failure gets the generic error page. */
+export const PAGES = {
+  sent: "/thanks.html",
+  error: "/enquiry-error.html",
+  tooLong: "/enquiry-too-long.html",
+};
+const TOO_LONG_OUTCOMES = new Set(["message_too_long", "too_large"]);
+
+/** Character count used for every limit: line breaks count as one (browsers submit CRLF), ends trimmed.
+ *  assets/js/site.js countChars() must stay identical (tests/enquiry.test.mjs compares them). */
+export function countChars(value) {
+  return normalise(value).length;
+}
+function normalise(value) {
+  return String(value).replace(/\r\n?/g, "\n").trim();
+}
 
 const ERRORS = {
   400: "invalid",
@@ -70,10 +91,12 @@ function wantsJson(request) {
   return (request.headers.get("accept") || "").toLowerCase().includes("application/json");
 }
 
-function respond(request, status) {
+function respond(request, status, outcome = "") {
   const ok = status >= 200 && status < 300;
+  const tooLong = TOO_LONG_OUTCOMES.has(outcome);
   if (wantsJson(request)) {
-    const body = ok ? { ok: true } : { ok: false, error: ERRORS[status] || "error" };
+    const error = outcome === "message_too_long" ? "message_too_long" : ERRORS[status] || "error";
+    const body = ok ? { ok: true } : { ok: false, error };
     return new Response(JSON.stringify(body), {
       status,
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
@@ -82,7 +105,7 @@ function respond(request, status) {
   // No-JS path: a normal form POST lands on a page in the site design.
   return new Response(null, {
     status: 303,
-    headers: { location: ok ? "/thanks.html" : "/enquiry-error.html", "cache-control": "no-store" },
+    headers: { location: ok ? PAGES.sent : tooLong ? PAGES.tooLong : PAGES.error, "cache-control": "no-store" },
   });
 }
 
@@ -150,9 +173,9 @@ async function parseForm(request) {
 function validate(spec, data) {
   const clean = {};
   for (const field of [...spec.required, ...spec.optional]) {
-    // Browsers submit textarea line breaks as CRLF but maxlength counts each as one character.
-    const value = typeof data[field] === "string" ? data[field].replace(/\r\n?/g, "\n").trim() : "";
-    if (value.length > LIMITS[field]) throw new HttpError(400, "too_long");
+    // Browsers submit textarea line breaks as CRLF; maxlength and the message counter count each as one.
+    const value = typeof data[field] === "string" ? normalise(data[field]) : "";
+    if (value.length > LIMITS[field]) throw new HttpError(400, field === "message" ? "message_too_long" : "too_long");
     if (!value && spec.required.includes(field)) throw new HttpError(400, "missing_field");
     clean[field] = value;
   }
@@ -223,7 +246,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   } catch (err) {
     if (err instanceof HttpError) {
       log(formType, err.outcome, err.status);
-      return respond(request, err.status);
+      return respond(request, err.status, err.outcome);
     }
     log(formType, "internal_error", 502);
     return respond(request, 502);

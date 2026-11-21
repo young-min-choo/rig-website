@@ -43,11 +43,11 @@ Mail and website are switched on **different days** on purpose: if something bre
 
 ## 0. Prerequisites
 
-0.1 **Luqman**: create the Google Workspace user `choo@regenig.com`. Every RIG account below
+0.1 **Luqman**: create the Google Workspace user `youngmin@regenig.com`. Every RIG account below
 (Cloudflare, Resend) is registered to that address, not to a personal or IA address.
 
 0.2 **Luqman**: in Squarespace Domains, open regenig.com → Permissions and invite
-`choo@regenig.com` as a **domain manager**. Accept the invite. You now see the DNS and
+`youngmin@regenig.com` as a **domain manager**. Accept the invite. You now see the DNS and
 nameserver settings for regenig.com. (Luqman's part ends here.)
 
 0.3 Record what is live today. Paste this into a terminal (needs `curl` and `jq`, both installed):
@@ -93,7 +93,7 @@ Do not delete anything at Squarespace at any point in this runbook.
 
 ## 1. Cloudflare account and zone (no live effect)
 
-1.1 Sign up at https://dash.cloudflare.com/sign-up with `choo@regenig.com`. Turn on two-factor
+1.1 Sign up at https://dash.cloudflare.com/sign-up with `youngmin@regenig.com`. Turn on two-factor
 authentication (My Profile → Authentication). Plan: **Free**.
 
 1.2 Add a domain → `regenig.com` → Free plan. Cloudflare scans the current records and imports
@@ -336,13 +336,13 @@ Pre-flight (all must be true):
 4. Mail test:
    - From a personal Gmail account, send a message to `info@regenig.com`; whoever reads info@
      confirms it arrived.
-   - From info@ (or choo@), reply to that personal account. In the received copy, ⋮ → "Show
+   - From info@ (or youngmin@), reply to that personal account. In the received copy, ⋮ → "Show
      original" must show **SPF: PASS, DKIM: PASS, DMARC: PASS**.
    If either fails, roll back now (step 5.1); nothing else depends on this switch yet.
 
 ### 4c. Resend: send from `send.regenig.com`
 
-4c.1 Sign up at https://resend.com with `choo@regenig.com`; turn on two-factor authentication.
+4c.1 Sign up at https://resend.com with `youngmin@regenig.com`; turn on two-factor authentication.
 
 4c.2 Domains → Add Domain → `send.regenig.com`. Region: pick the one closest to where data
 should live (Tokyo `ap-northeast-1` fits RIG; whichever is chosen, the Privacy Policy must name

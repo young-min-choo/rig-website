@@ -413,8 +413,10 @@ for (const vp of VIEWPORTS) {
     // ruling R2 (review C3-1): live count, no silent truncation, over-limit submit blocked with the text kept
     {
       const msgSel = `#${prefix}-msg`;
-      const num = page.locator(`#${prefix}-msg-count > span:first-child`);
-      const liveText = () => page.evaluate(() => document.querySelector("form [data-count-live]").textContent);
+      // null-safe reads, so a missing counter is a recorded FAIL rather than a 30 s locator timeout
+      const num = { textContent: () => page.evaluate((p) => { const n = document.querySelector(`#${p}-msg-count > span`); return n ? n.textContent : null; }, prefix) };
+      const countClass = () => page.evaluate((p) => { const c = document.getElementById(`${p}-msg-count`); return c ? c.className : ""; }, prefix);
+      const liveText = () => page.evaluate(() => { const l = document.querySelector("form [data-count-live]"); return l ? l.textContent : null; });
       const settle = () => page.waitForTimeout(900); // the live region updates 700 ms after typing stops
       check(`${id}: message has no maxlength`, (await page.getAttribute(msgSel, "maxlength")) === null);
       const wiring = await page.evaluate((p) => {
@@ -440,10 +442,10 @@ for (const vp of VIEWPORTS) {
       await page.fill(msgSel, long);
       check(`${id}: a 6,000-character paste is kept whole (no silent truncation)`, (await page.inputValue(msgSel)).length === 6000, String((await page.inputValue(msgSel)).length));
       check(`${id}: counter shows "6,000 / 5,000" in the over state`, (await num.textContent()) === "6,000 / 5,000" &&
-        (await page.getAttribute(`#${prefix}-msg-count`, "class")).includes("is-over") && (await page.getAttribute(msgSel, "aria-invalid")) === "true",
+        (await countClass()).includes("is-over") && (await page.getAttribute(msgSel, "aria-invalid")) === "true",
         await num.textContent());
       await waitOrFail(`${id}: over-limit count announced`, () => page.waitForFunction(() =>
-        document.querySelector("form [data-count-live]").textContent === "Your message is 1,000 characters over the limit of 5,000.", null, { timeout: 3000 }));
+        (document.querySelector("form [data-count-live]") || {}).textContent === "Your message is 1,000 characters over the limit of 5,000.", null, { timeout: 3000 }));
       const over = await page.evaluate(pageProbe, MIN_CONTRAST);
       check(`${id}: contrast ≥ ${MIN_CONTRAST}:1 with the counter in its over state`, over.contrast.low.length === 0, over.contrast.low.slice(0, 4).join(" | "));
       check(`${id}: no overflow with the counter in its over state`, over.overflow <= 0, `${over.overflow}px`);
@@ -468,7 +470,7 @@ for (const vp of VIEWPORTS) {
       check(`${id}: 5,001 characters (with line breaks) are blocked "by 1"`, /shorten yours by 1,/.test(await status.textContent()) && apiHits.length === hits, await status.textContent());
       await page.fill(msgSel, at);
       check(`${id}: 5,000 characters with 9 line breaks count as "5,000 / 5,000"`, (await num.textContent()) === "5,000 / 5,000" &&
-        !(await page.getAttribute(`#${prefix}-msg-count`, "class")).includes("is-over"), await num.textContent());
+        !(await countClass()).includes("is-over"), await num.textContent());
       await page.locator("form button[type=submit]").click();
       await waitOrFail(`${id}: at-limit submit settles within 5 s`, () => page.waitForFunction(() => /Thank you|could not|limited/.test(document.querySelector("form .form-status").textContent), null, { timeout: 5000 }));
       const atMail = upstream.calls[mails];

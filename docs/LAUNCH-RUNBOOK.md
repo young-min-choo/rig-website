@@ -402,7 +402,8 @@ Then redeploy (3.2) so the new deployment picks the secret up.
   so it must not stay open). Real enquiries arrive only through regenig.com, after 4d.
 
 Outcomes you may see in the log: `sent`, `honeypot` (spam trap filled, nothing sent),
-`bad_origin`, `too_large` (body over 64 KB), `missing_field`, `too_long`, `bad_email`,
+`bad_origin`, `too_large` (body over 64 KB), `message_too_long` (message over 5,000 characters;
+visitor sees `/enquiry-too-long.html`), `missing_field`, `too_long`, `bad_email`,
 `no_consent`, `unknown_form`, `bad_content_type` / `bad_body` / `file_upload` (not a normal form
 post; refused with 400), `upstream_error` / `upstream_unreachable` (Resend refused or was
 unreachable → visitor sees the error page), `config_missing`.
@@ -553,7 +554,8 @@ Then by hand:
 - [ ] **Forms deliver to info@**: send one private and one partner enquiry on https://regenig.com/;
       both arrive in info@ with the `[Website] …` subjects; Reply goes to the enquirer.
 - [ ] **No-JS path**: with JavaScript disabled in the browser, submitting a form lands on
-      `/thanks.html` (or `/enquiry-error.html` on failure).
+      `/thanks.html` (or `/enquiry-error.html` on failure); a message over 5,000 characters lands on
+      `/enquiry-too-long.html`, and with JavaScript on the count under the message stops the send.
 - [ ] **No third-party requests**: browser DevTools → Network → reload each page with "Disable
       cache" ticked; every request's domain is `regenig.com`. DevTools Console shows no errors or
       CSP violations.

@@ -499,6 +499,9 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
     "zh/index.html": { must: ["依照日本再生医疗相关法规提供"], never: ["严格", "严苛", "监管体系约束"] },
     "ar/index.html": { must: ["وفق أنظمة الطب التجديدي في اليابان"], never: ["الصارمة", "صارمة", "الرقابة التنظيمية"] },
     "zh/about.html": { must: ["以精准、细致与严谨的医疗规范而著称", "日本的专科医疗"], never: ["先进医疗", "高标准", "世界标准", "世界的标准"] },
+    // "healthcare coordinators" are people (review I1-4), as in ar منسّقي الرعاية الصحية
+    "zh/partners.html": { must: ["医疗协调员"], never: ["医疗协调机构"] },
+    "ar/partners.html": { must: ["منسقي الرعاية الصحية"], never: [] },
     "ar/about.html": { must: ["عرفت اليابان بالدقة والعناية والانضباط الطبي", "طبها التخصصي"], never: ["طبها المتقدم", "معايير رفيعة", "المعيار العالمي"] },
   };
   const unmark = (s) => s.replace(/[\u064B-\u065F\u0670\u0640]/g, "");

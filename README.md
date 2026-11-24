@@ -19,10 +19,26 @@ a Squarespace "Coming Soon" page on Squarespace DNS; the switch is in [`docs/LAU
 | `disclaimer.html` | All | **Interim** text (v1 notice adapted) — final text to be supplied |
 | `services/process/network/team/contact.html` | — | v1 URLs kept as redirect stubs to their new homes (also 301s in `_redirects`) |
 | `thanks.html` · `enquiry-error.html` · `enquiry-too-long.html` · `404.html` | — | Form outcome pages (no-JS path) and the not-found page; `noindex` |
+| `zh/*.html` · `ar/*.html` | Chinese (Simplified) / Arabic (RTL) visitors | Same page names as EN for index, about, partners and the four outcome/404 pages. **AI draft translations, pending native review** (marked `<!-- TRANSLATION: … -->` at the top). Legal pages are not translated: links go to the English privacy/disclaimer pages with a note |
 | `functions/api/enquiry.js` | — | Cloudflare Pages Function behind both forms (`POST /api/enquiry`) |
 | `_headers` · `_redirects` · `robots.txt` · `sitemap.xml` | — | Cloudflare Pages config (CSP, HSTS, caching; v1 301s) and crawler files |
 
-Menu: Home · About · Partners · Enquire, plus language switcher (EN live; 中文 / العربية pending).
+Menu: Home · About · Partners · Enquire, plus language switcher EN | 中文 | العربية (links to the same page in each edition;
+English-only pages link to the other editions' home; `aria-current` marks the active language).
+
+## Languages (i18n)
+- Editions: English at the root, `zh/` (`lang="zh-Hans"`), `ar/` (`lang="ar" dir="rtl"`). Each indexable page carries its own
+  canonical plus `rel="alternate" hreflang` links for en / zh-Hans / ar / x-default (= English); `sitemap.xml` lists every edition with
+  `xhtml:link` alternates. Status pages and the English-only legal pages carry no alternates.
+- Fonts: Chinese uses system fonts only (PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans CJK SC …); Arabic uses the
+  self-hosted Noto Naskh Arabic (Arabic-script subset, 94 KB, OFL licence beside it), loaded only by `ar/` pages. Latin glyphs
+  stay Cormorant / Inter. Arabic pages use Western digits.
+- Forms: a hidden `lang` field (en | zh | ar). Without JS the function redirects to that edition's thanks / error / too-long page
+  (fixed allow-list `LANGS`; unknown → English; the value is never copied into `Location`). The email to info@ stays English
+  with a `Language:` line. `site.js` reads its status and counter text from the form's `data-i18n-*` attributes (English default).
+- Content rules apply in every language; `tests/static-check.mjs` scans zh/ar pages for a banned-term list per language
+  (`BANNED_TERMS` in `tests/lib/rules.mjs`).
+- Cloudflare Pages serves the nearest `404.html` up the tree, so `/zh/…` and `/ar/…` misses get `zh/404.html` / `ar/404.html`.
 
 ## Design system
 - Deep navy / near-black grounds, ivory text, champagne gold (`#c8b27c`) accents
@@ -87,7 +103,7 @@ Still open (owners):
 - [ ] Dr. Lucas full name + credentials; leadership photos + short bios
 - [ ] Hero footage
 - [ ] regenig.com DNS → Cloudflare (DNSSEC off first) and website cutover (runbook 4a–4d), then post-launch checks (runbook 6)
-- [ ] Chinese (Simplified) + Arabic (RTL) editions (in-house AI translation, after launch)
+- [ ] Chinese (Simplified) + Arabic (RTL) editions: built on branch `i18n` (AI draft); native review + Choo's OK before merge
 
 ## Deploy
 - **Production: Cloudflare Pages**, project `regenig`, Direct Upload with `npx wrangler pages deploy` from the repo

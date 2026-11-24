@@ -1,10 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Clean URLs: Cloudflare Pages serves /about.html at /about (and / for index.html).
-     Keep in step with the <link rel="canonical"> on each page; tests/static-check.mjs enforces it. -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://regenig.com/</loc></url>
-  <url><loc>https://regenig.com/about</loc></url>
-  <url><loc>https://regenig.com/partners</loc></url>
+<!-- Clean URLs: Cloudflare Pages serves /about.html at /about (and / for index.html; /zh/ for zh/index.html).
+     Keep in step with the <link rel="canonical"> and rel="alternate" hreflang links on each page;
+     tests/static-check.mjs enforces both. Privacy and Disclaimer exist in English only (no alternates). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://regenig.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/zh/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/ar/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/about"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/about"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/zh/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/about"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/about"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/ar/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/about"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/about"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/partners</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/partners"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/partners"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/partners"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/partners"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/zh/partners</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/partners"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/partners"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/partners"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/partners"/>
+  </url>
+  <url>
+    <loc>https://regenig.com/ar/partners</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://regenig.com/partners"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://regenig.com/zh/partners"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://regenig.com/ar/partners"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://regenig.com/partners"/>
+  </url>
   <url><loc>https://regenig.com/privacy</loc></url>
   <url><loc>https://regenig.com/disclaimer</loc></url>
 </urlset>

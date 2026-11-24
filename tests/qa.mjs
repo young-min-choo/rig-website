@@ -35,7 +35,20 @@ const PAGES = [
   ["enquiry-error", "/enquiry-error.html"],
   ["enquiry-too-long", "/enquiry-too-long.html"],
   ["404", "/no/such/page"],
+  // i18n: the zh-Hans and ar (RTL) editions
+  ...["zh", "ar"].flatMap((l) => [
+    [`${l}-home`, `/${l}/`],
+    [`${l}-about`, `/${l}/about.html`],
+    [`${l}-partners`, `/${l}/partners.html`],
+    [`${l}-thanks`, `/${l}/thanks.html`],
+    [`${l}-enquiry-error`, `/${l}/enquiry-error.html`],
+    [`${l}-enquiry-too-long`, `/${l}/enquiry-too-long.html`],
+    [`${l}-404`, `/${l}/no/such/page`],
+  ]),
 ];
+const EDITION = { en: { lang: "en", dir: "ltr" }, zh: { lang: "zh-Hans", dir: "ltr" }, ar: { lang: "ar", dir: "rtl" } };
+const editionOfName = (name) => (/^(zh|ar)-/.exec(name) || [, "en"])[1];
+const AR_FONT = "/assets/fonts/noto-naskh-arabic-variable.woff2";
 const STUBS = [
   ["/services.html", "/index.html#regenerative-medicine"],
   ["/process.html", "/index.html#journey"],
@@ -72,7 +85,8 @@ const MIME = {
   ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".xml": "application/xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8", ".mp4": "video/mp4", ".webm": "video/webm", ".ico": "image/x-icon",
 };
-// Like Cloudflare Pages: "/" → index.html, "/about" → about.html, unknown → 404.html (status 404).
+// Like Cloudflare Pages: "/" → index.html, "/about" → about.html, unknown → the nearest 404.html
+// up the directory tree (status 404), so /zh/x gets zh/404.html.
 function resolveFile(pathname) {
   let p = decodeURIComponent(pathname);
   if (p.endsWith("/")) p += "index.html";
@@ -117,7 +131,8 @@ const server = http.createServer(async (req, res) => {
     }
     const file = resolveFile(url.pathname);
     const status = file ? 200 : 404;
-    const served = file || join(ROOT, "404.html");
+    const folder = /^\/(zh|ar)\//.exec(url.pathname);
+    const served = file || join(ROOT, folder && existsSync(join(ROOT, folder[1], "404.html")) ? `${folder[1]}/404.html` : "404.html");
     res.writeHead(status, { "content-type": MIME[extname(served)] || "application/octet-stream", ...headersFor(url.href) });
     res.end(req.method === "HEAD" ? undefined : readFileSync(served));
   } catch (e) {
@@ -237,7 +252,7 @@ for (const vp of VIEWPORTS) {
   for (const [name, path] of PAGES) {
     const { page, log, response } = await openPage(context, path);
     const id = `${name}@${tag}`;
-    const expectStatus = name === "404" ? 404 : 200;
+    const expectStatus = /(^|-)404$/.test(name) ? 404 : 200;
     check(`${id}: HTTP ${expectStatus}`, response.status() === expectStatus, String(response.status()));
     check(`${id}: CSP header served`, response.headers()["content-security-policy"] === siteCsp && !!siteCsp);
     check(`${id}: no X-Robots-Tag (site stays indexable off pages.dev)`, !("x-robots-tag" in response.headers()), response.headers()["x-robots-tag"]);
@@ -261,14 +276,71 @@ for (const vp of VIEWPORTS) {
     const csp = await page.evaluate(() => window.__csp);
     check(`${id}: zero CSP violations`, csp.length === 0, csp.join(" | "));
     // The 404 document itself is reported by Chromium as a failed resource; nothing else may be.
-    const errors = log.console.filter((t) => !(name === "404" && /status of 404/.test(t) && log.console.filter((x) => /status of 404/.test(x)).length === 1));
+    const errors = log.console.filter((t) => !(/(^|-)404$/.test(name) && /status of 404/.test(t) && log.console.filter((x) => /status of 404/.test(x)).length === 1));
     check(`${id}: zero console errors`, errors.length === 0 && log.pageErrors.length === 0, [...errors, ...log.pageErrors].join(" | "));
     for (const hp of probe.honeypots) {
       check(`${id}: honeypot out of tab order / AT / sight`, hp.tabindex === -1 && hp.ariaHidden && hp.clipped && hp.area <= 1 && hp.autocomplete === "off", JSON.stringify(hp));
     }
     if (probe.honeypots.length) {
       const snap = await page.locator("form").ariaSnapshot();
-      check(`${id}: honeypot absent from accessibility tree`, !/Leave this field empty|website/i.test(snap));
+      check(`${id}: honeypot absent from accessibility tree`, !/Leave this field empty|此栏请留空|اتركوا هذا الحقل فارغاً|website/i.test(snap));
+    }
+
+    // i18n: language + direction, fonts, mirroring, switcher
+    {
+      const code = editionOfName(name);
+      const ed = EDITION[code];
+      const doc = await page.evaluate(() => ({ lang: document.documentElement.lang, dir: document.documentElement.dir, direction: getComputedStyle(document.body).direction }));
+      check(`${id}: <html lang="${ed.lang}" dir="${ed.dir}">, body direction ${ed.dir}`, doc.lang === ed.lang && doc.dir === ed.dir && doc.direction === ed.dir, JSON.stringify(doc));
+      const arFontRequested = log.requests.some((u) => u.endsWith(AR_FONT));
+      if (code === "ar") {
+        const loaded = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some((f) => f.family.replace(/["']/g, "") === "Noto Naskh Arabic" && f.status === "loaded"); });
+        check(`${id}: self-hosted Arabic font loaded`, arFontRequested && loaded, `requested=${arFontRequested} loaded=${loaded}`);
+      } else {
+        check(`${id}: Arabic font not downloaded (only ar/ uses it)`, !arFontRequested);
+      }
+      const geo = await page.evaluate(() => {
+        const r = (el) => el && el.getBoundingClientRect();
+        const nav = r(document.querySelector(".site-header nav"));
+        const mark = r(document.querySelector(".site-header .wordmark"));
+        const burger = r(document.querySelector(".burger"));
+        const items = [...document.querySelectorAll(".nav-menu > li")].map(r).filter((b) => b.width > 0);
+        const field = document.querySelector(".field");
+        let label = null, input = null;
+        if (field) { // the label's text extent, not its full-width block box
+          const range = document.createRange();
+          range.selectNodeContents(field.querySelector("label"));
+          label = range.getBoundingClientRect();
+          input = r(field.querySelector("input, textarea"));
+        }
+        const h = document.querySelector("main h2, main h1:not(.brandline)");
+        return {
+          markLeft: mark.left - nav.left, markRight: nav.right - mark.right,
+          burgerLeft: burger && burger.width ? burger.left - nav.left : null,
+          itemsX: items.map((b) => Math.round(b.left)),
+          label: label ? { left: label.left - input.left, right: input.right - label.right } : null,
+          headingAlign: h ? getComputedStyle(h).textAlign : null,
+        };
+      });
+      if (ed.dir === "rtl") {
+        check(`${id}: RTL header — wordmark on the right`, geo.markRight < geo.markLeft, JSON.stringify(geo));
+        if (geo.itemsX.length > 1) check(`${id}: RTL nav order mirrored (first item rightmost)`, geo.itemsX.every((x, i, a) => i === 0 || x < a[i - 1]), geo.itemsX.join(","));
+        if (geo.burgerLeft !== null) check(`${id}: RTL burger on the left`, geo.burgerLeft < 60, String(geo.burgerLeft));
+        if (geo.label) check(`${id}: RTL form labels start at the right edge`, Math.abs(geo.label.right) < 1 && geo.label.left > 1, JSON.stringify(geo.label));
+      } else {
+        check(`${id}: LTR header — wordmark on the left`, geo.markLeft < geo.markRight, JSON.stringify(geo));
+        if (geo.itemsX.length > 1) check(`${id}: LTR nav order (first item leftmost)`, geo.itemsX.every((x, i, a) => i === 0 || x > a[i - 1]), geo.itemsX.join(","));
+        if (geo.label) check(`${id}: LTR form labels start at the left edge`, Math.abs(geo.label.left) < 1, JSON.stringify(geo.label));
+      }
+      // language switcher: three real links that resolve (200), the active one marked
+      const sw = await page.evaluate(() => [...document.querySelectorAll(".nav-menu .lang a")].map((a) => ({ href: a.href, hreflang: a.hreflang, lang: a.lang, current: a.getAttribute("aria-current") })));
+      check(`${id}: switcher EN | 中文 | العربية with aria-current on ${ed.lang}`, sw.map((a) => a.hreflang).join(",") === "en,zh-Hans,ar" &&
+        sw.every((a) => a.lang === a.hreflang) && sw.filter((a) => a.current === "true").map((a) => a.hreflang).join() === ed.lang, JSON.stringify(sw));
+      for (const a of sw) {
+        const r = await page.request.get(a.href);
+        const body = await r.text();
+        check(`${id}: switcher ${a.hreflang} → ${new URL(a.href).pathname} (200, lang=${a.hreflang})`, r.status() === 200 && new RegExp(`<html lang="${a.hreflang}"`).test(body), String(r.status()));
+      }
     }
 
     // keyboard focus: tab through every stop; links/buttons need a visible outline
@@ -523,6 +595,89 @@ for (const vp of VIEWPORTS) {
     await page.close();
   }
 
+  // i18n forms (zh, ar): localised status + counter text from the form's data-i18n-* templates,
+  // the real function behind them, and the Language line in the email
+  for (const [lang, path, prefix, fields, type] of [
+    ["zh", "/zh/", "pe", { name: "王小明", email: "wang.qa@example.com", wa: "+60 12 000 0001", msg: "您好，想了解东京的咨询安排。" }, "private-enquiry"],
+    ["zh", "/zh/partners.html", "pf", { name: "陈医生", pos: "院长", org: "QA 诊所", country: "新加坡", email: "chen.qa@example.com", msg: "希望洽谈合作。" }, "partner-enquiry"],
+    ["ar", "/ar/", "pe", { name: "سارة أحمد", email: "sara.qa@example.com", wa: "+971 50 000 0000", msg: "أود الاستفسار عن استشارة في طوكيو." }, "private-enquiry"],
+    ["ar", "/ar/partners.html", "pf", { name: "د. خالد", pos: "مدير طبي", org: "عيادة الخليج", country: "الإمارات", email: "khalid.qa@example.com", msg: "نود مناقشة شراكة." }, "partner-enquiry"],
+  ]) {
+    const id = `${lang}-${type}@${tag}`;
+    const { page, log } = await openPage(context, path);
+    const status = page.locator("form .form-status");
+    const T = await page.evaluate(() => Object.fromEntries([...document.querySelector("form").attributes].filter((a) => a.name.startsWith("data-i18n-")).map((a) => [a.name.slice(10), a.value])));
+    const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+    check(`${id}: form carries its ${Object.keys(T).length} localised strings`, Object.keys(T).length === 10, Object.keys(T).join(","));
+
+    const before = apiHits.length;
+    await page.locator("form button[type=submit]").click();
+    await page.waitForTimeout(150);
+    check(`${id}: empty submit shows the localised required-fields status`, (await status.textContent()) === T.required, await status.textContent());
+    check(`${id}: empty submit sends nothing`, apiHits.length === before);
+
+    const num = () => page.evaluate((p) => { const n = document.querySelector(`#${p}-msg-count > span`); return n ? n.textContent : null; }, prefix);
+    const unit = await page.evaluate((p) => { const n = document.querySelector(`#${p}-msg-count .sr-only`); return n ? n.textContent : null; }, prefix);
+    check(`${id}: counter unit localised`, unit === T.unit, unit);
+    const liveText = () => page.evaluate(() => { const l = document.querySelector("form [data-count-live]"); return l ? l.textContent : null; });
+    await page.fill(`#${prefix}-msg`, "n".repeat(4600));
+    await page.waitForTimeout(900);
+    check(`${id}: near the limit the localised remaining count is announced`, (await liveText()) === fill(T.left, { n: "400", limit: "5,000" }), await liveText());
+    await page.fill(`#${prefix}-msg`, "a".repeat(6000));
+    await page.waitForTimeout(900);
+    check(`${id}: over the limit: "6,000 / 5,000" + localised announcement`, (await num()) === "6,000 / 5,000" && (await liveText()) === fill(T.over, { n: "1,000", limit: "5,000" }), `${await num()} | ${await liveText()}`);
+    for (const [k, v] of Object.entries(fields)) if (k !== "msg") await page.fill(`#${prefix}-${k}`, v);
+    await page.check(`#${prefix}-consent`);
+    const hits = apiHits.length;
+    await page.locator("form button[type=submit]").click();
+    await page.waitForTimeout(300);
+    check(`${id}: over-limit submit blocked with the localised status`, (await status.textContent()) === fill(T["too-long"], { limit: "5,000", over: "1,000" }) && apiHits.length === hits, await status.textContent());
+    const over = await page.evaluate(pageProbe, MIN_CONTRAST);
+    check(`${id}: no overflow / contrast ok with the counter over and the status shown`, over.overflow <= 0 && over.contrast.low.length === 0, `${over.overflow}px ${over.contrast.low.slice(0, 3).join(" | ")}`);
+    await page.screenshot({ path: join(SHOTS, `form-${lang}-${type}-over-${tag}.png`) });
+
+    await page.fill(`#${prefix}-msg`, fields.msg);
+    check(`${id}: counter counts ${lang} text`, (await num()) === `${fields.msg.length} / 5,000`, await num());
+    upstream.status = 200;
+    const sent = upstream.calls.length;
+    await page.locator("form button[type=submit]").click();
+    await waitOrFail(`${id}: JS submit settles within 5 s`, () => page.waitForFunction((t) => [t.sent, t.failed].includes(document.querySelector("form .form-status").textContent), T, { timeout: 5000 }));
+    check(`${id}: JS submit shows the localised thank-you status`, (await status.textContent()) === T.sent, await status.textContent());
+    const mail = upstream.calls[sent];
+    check(`${id}: delivered once; email in English with "Language: ${lang}"`, upstream.calls.length === sent + 1 && !!mail &&
+      mail.text.split("\n").includes(`Language: ${lang}`) && /^\[Website\] (Private|Partner) enquiry — /.test(mail.subject) && mail.text.includes(fields.msg), mail && mail.subject);
+    for (const [k, v] of Object.entries(fields)) await page.fill(`#${prefix}-${k}`, v);
+    await page.check(`#${prefix}-consent`);
+    upstream.status = 500;
+    await page.locator("form button[type=submit]").click();
+    await waitOrFail(`${id}: upstream failure settles within 5 s`, () => page.waitForFunction((t) => document.querySelector("form .form-status").textContent === t.failed, T, { timeout: 5000 }));
+    check(`${id}: upstream failure shows the localised error (with info@regenig.com)`, (await status.textContent()) === T.failed && T.failed.includes("info@regenig.com"));
+    upstream.status = 200;
+    check(`${id}: zero third-party requests`, foreign(log.requests).length === 0, foreign(log.requests).join(", "));
+    check(`${id}: no CSP violations / page errors`, (await page.evaluate(() => window.__csp)).length === 0 && log.pageErrors.length === 0, log.pageErrors.join(" | "));
+    await page.close();
+  }
+
+  // RTL mobile menu: opens from the keyboard, items start at the right, switcher links on one row
+  if (vp.width < 860) {
+    const { page } = await openPage(context, "/ar/about.html");
+    await page.focus("#nav-toggle");
+    await page.keyboard.press("Space");
+    const m = await page.evaluate(() => {
+      const menu = document.querySelector(".nav-menu");
+      const mr = menu.getBoundingClientRect();
+      const first = document.querySelector(".nav-menu > li > a");
+      const range = document.createRange(); range.selectNodeContents(first);
+      const tr = range.getBoundingClientRect();
+      const langs = [...menu.querySelectorAll(".lang a")].map((a) => a.getBoundingClientRect());
+      return { open: getComputedStyle(menu).display !== "none", textRightGap: mr.right - tr.right, textLeftGap: tr.left - mr.left,
+        langRow: langs.length === 3 && langs.every((b) => Math.abs(b.top - langs[0].top) < 2), langOrderRtl: langs.length === 3 && langs[0].left > langs[2].left };
+    });
+    check(`menu-ar@${tag}: opens; items start at the right; switcher links on one row, mirrored`, m.open && m.textRightGap < m.textLeftGap && m.langRow && m.langOrderRtl, JSON.stringify(m));
+    await page.screenshot({ path: join(SHOTS, `menu-open-ar-${tag}.png`) });
+    await page.close();
+  }
+
   // v1 stubs land on their new homes
   for (const [from, to] of STUBS) {
     const { page } = await openPage(context, from);
@@ -572,6 +727,33 @@ for (const vp of VIEWPORTS) {
     await page.screenshot({ path: join(SHOTS, "nojs-too-long-390.png"), fullPage: true });
     await page.close();
   }
+  // i18n no-JS: each edition lands on its own outcome page (the function maps the hidden lang field)
+  for (const [lang, path, prefix, fields, mode, expect] of [
+    ["zh", "/zh/partners.html", "pf", { name: "无脚本", pos: "主任", org: "无脚本机构", country: "日本", email: "nojs.zh@example.com", msg: "无脚本提交。" }, 200, "/zh/thanks.html"],
+    ["ar", "/ar/partners.html", "pf", { name: "بدون جافاسكربت", pos: "مدير", org: "مؤسسة", country: "اليابان", email: "nojs.ar@example.com", msg: "إرسال بدون جافاسكربت." }, 500, "/ar/enquiry-error.html"],
+    ["ar", "/ar/", "pe", { name: "بدون جافاسكربت", email: "nojs.ar@example.com", msg: "ب".repeat(6000) }, 200, "/ar/enquiry-too-long.html"],
+    ["zh", "/zh/", "pe", { name: "无脚本", email: "nojs.zh@example.com", msg: "你好" }, "no-consent", "/zh/enquiry-error.html"],
+  ]) {
+    const page = await context.newPage();
+    const ext = [];
+    page.on("request", (r) => ext.push(r.url()));
+    await page.goto(ORIGIN + path);
+    for (const [k, v] of Object.entries(fields)) await page.fill(`#${prefix}-${k}`, v);
+    if (mode !== "no-consent") await page.check(`#${prefix}-consent`);
+    upstream.status = mode === 500 ? 500 : 200;
+    const sent = upstream.calls.length;
+    await Promise.all([page.waitForURL(`**${expect}`, { timeout: 5000 }).catch(() => {}), page.click("form button[type=submit]")]);
+    const landed = new URL(page.url()).pathname;
+    const docLang = await page.locator("html").getAttribute("lang");
+    check(`no-JS ${lang} ${path} (${mode}) → ${expect} (lang ${EDITION[lang].lang})`, landed === expect && docLang === EDITION[lang].lang, `${landed} ${docLang}`);
+    const delivered = upstream.calls.length - sent;
+    check(`no-JS ${lang} ${path} (${mode}): ${mode === 500 ? "one (failed) Resend call" : expect.endsWith("thanks.html") ? "delivered once" : "nothing delivered"}`,
+      delivered === (mode === 200 && expect.endsWith("thanks.html") ? 1 : mode === 500 ? 1 : 0), String(delivered));
+    if (expect.endsWith("thanks.html")) check(`no-JS ${lang}: email has "Language: ${lang}"`, upstream.calls[sent].text.split("\n").includes(`Language: ${lang}`));
+    check(`no-JS ${lang} ${path}: no third-party requests`, foreign(ext).length === 0);
+    await page.close();
+  }
+  upstream.status = 200;
   // missing consent without JS → error page, nothing delivered
   const page = await context.newPage();
   await page.goto(ORIGIN + "/");

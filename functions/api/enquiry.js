@@ -10,6 +10,10 @@
  *   ALLOWED_ORIGINS  required, comma list, e.g. https://regenig.com,https://www.regenig.com
  *   RESEND_API_URL   optional override (tests / local mocks only)
  *
+ * Language: the forms carry a hidden `lang` (en | zh | ar). The no-JS path lands on that
+ * edition's thanks / error / too-long page; the email to info@ stays English with a
+ * "Language:" line. Unknown or missing → English. See LANGS.
+ *
  * Logging: one line per request with the form type, the outcome and a status
  * code. Never names, emails, phones, messages or IP addresses.
  */
@@ -56,6 +60,36 @@ export const PAGES = {
 };
 const TOO_LONG_OUTCOMES = new Set(["message_too_long", "too_large"]);
 
+/* Site languages and the folder that holds each one's outcome pages (zh/thanks.html …).
+ * The no-JS redirect is always one of these fixed paths: the submitted `lang` value is only
+ * ever looked up in this table, never copied into the Location header. Unknown or missing → en. */
+export const LANGS = Object.freeze({ en: "", zh: "/zh", ar: "/ar" });
+export const DEFAULT_LANG = "en";
+
+/** The site language for a submitted `lang` value: a LANGS key, else "en". */
+export function pickLang(value) {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return Object.keys(LANGS).find((k) => k === v) || DEFAULT_LANG;
+}
+
+/** The outcome pages for a language (always a LANGS prefix + a PAGES path). */
+export function pagesFor(lang) {
+  const prefix = LANGS[pickLang(lang)];
+  return { sent: prefix + PAGES.sent, error: prefix + PAGES.error, tooLong: prefix + PAGES.tooLong };
+}
+
+/* Before the body is read (config missing, bad origin, body over the cap) the form's `lang`
+ * field is not available. The page the form sat on is: map its first path segment through
+ * LANGS, so a zh visitor still lands on the zh error page. Nothing from the Referer is reflected. */
+function langFromReferer(request) {
+  const referer = request.headers.get("referer");
+  if (!referer) return DEFAULT_LANG;
+  try {
+    const seg = new URL(referer).pathname.split("/")[1] || "";
+    return seg === DEFAULT_LANG ? DEFAULT_LANG : pickLang(seg);
+  } catch { return DEFAULT_LANG; }
+}
+
 /** Character count used for every limit: line breaks count as one (browsers submit CRLF), ends trimmed.
  *  assets/js/site.js countChars() must stay identical (tests/enquiry.test.mjs compares them). */
 export function countChars(value) {
@@ -91,7 +125,7 @@ function wantsJson(request) {
   return (request.headers.get("accept") || "").toLowerCase().includes("application/json");
 }
 
-function respond(request, status, outcome = "") {
+function respond(request, status, outcome = "", lang = DEFAULT_LANG) {
   const ok = status >= 200 && status < 300;
   const tooLong = TOO_LONG_OUTCOMES.has(outcome);
   if (wantsJson(request)) {
@@ -102,10 +136,11 @@ function respond(request, status, outcome = "") {
       headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
     });
   }
-  // No-JS path: a normal form POST lands on a page in the site design.
+  // No-JS path: a normal form POST lands on a page in the site design, in the form's language.
+  const pages = pagesFor(lang);
   return new Response(null, {
     status: 303,
-    headers: { location: ok ? PAGES.sent : tooLong ? PAGES.tooLong : PAGES.error, "cache-control": "no-store" },
+    headers: { location: ok ? pages.sent : tooLong ? pages.tooLong : pages.error, "cache-control": "no-store" },
   });
 }
 
@@ -184,7 +219,7 @@ function validate(spec, data) {
   return clean;
 }
 
-function buildEmail(formType, spec, clean, env) {
+function buildEmail(formType, spec, clean, env, lang = DEFAULT_LANG) {
   const subjectValue = oneLine(clean[spec.subjectField]).slice(0, 120);
   const lines = [`${spec.label} from the website.`, ""];
   const rows = formType === "private-enquiry"
@@ -192,6 +227,8 @@ function buildEmail(formType, spec, clean, env) {
     : [["Name", clean.name], ["Position", clean.position], ["Organisation", clean.organisation],
        ["Country", clean.country], ["Email", clean.email]];
   for (const [k, v] of rows) lines.push(`${k}: ${oneLine(v)}`);
+  // The email stays in English for info@; the line says which edition of the site sent it.
+  lines.push(`Language: ${pickLang(lang)}`);
   lines.push("Consent: given (Privacy Policy)", "", "Message:", clean.message.replace(/\r\n?/g, "\n"));
   return {
     from: oneLine(env.MAIL_FROM),
@@ -204,16 +241,18 @@ function buildEmail(formType, spec, clean, env) {
 
 export async function handle(request, env = {}, fetchImpl = fetch) {
   let formType = "unknown";
+  let lang = langFromReferer(request); // until the form's own `lang` field has been read
   try {
     if (!env.RESEND_API_KEY || !env.MAIL_TO || !env.MAIL_FROM || allowedOrigins(env).length === 0) {
       log(formType, "config_missing", 503);
-      return respond(request, 503); // JSON: 503; no-JS: 303 to the error page
+      return respond(request, 503, "", lang); // JSON: 503; no-JS: 303 to the error page
     }
 
     const origin = requestOrigin(request);
     if (!origin || !allowedOrigins(env).includes(origin)) throw new HttpError(403, "bad_origin");
 
     const data = await parseForm(request);
+    lang = pickLang(data.lang); // the form says which edition it is; unknown or missing → en
     formType = typeof data.form === "string" ? data.form.trim() : "";
     const spec = Object.prototype.hasOwnProperty.call(FORMS, formType) ? FORMS[formType] : null;
     if (!spec) throw new HttpError(400, "unknown_form");
@@ -221,11 +260,11 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     // Honeypot: a person never sees this field. Pretend success, send nothing.
     if (typeof data[HONEYPOT_FIELD] === "string" && data[HONEYPOT_FIELD].trim() !== "") {
       log(formType, "honeypot", 200);
-      return respond(request, 200);
+      return respond(request, 200, "", lang);
     }
 
     const clean = validate(spec, data);
-    const email = buildEmail(formType, spec, clean, env);
+    const email = buildEmail(formType, spec, clean, env, lang);
 
     let upstream;
     try {
@@ -239,17 +278,17 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     }
     if (!upstream || !upstream.ok) {
       log(formType, "upstream_error", upstream ? upstream.status : 0);
-      return respond(request, 502);
+      return respond(request, 502, "", lang);
     }
     log(formType, "sent", 200);
-    return respond(request, 200);
+    return respond(request, 200, "", lang);
   } catch (err) {
     if (err instanceof HttpError) {
       log(formType, err.outcome, err.status);
-      return respond(request, err.status, err.outcome);
+      return respond(request, err.status, err.outcome, lang);
     }
     log(formType, "internal_error", 502);
-    return respond(request, 502);
+    return respond(request, 502, "", lang);
   }
 }
 

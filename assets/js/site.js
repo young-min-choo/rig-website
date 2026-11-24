@@ -5,7 +5,8 @@
    3. Forms: post to data-endpoint (/api/enquiry) with Accept: application/json
       and show the outcome inline; a live character count under the message.
       Without JS the form is a normal POST that lands on thanks.html,
-      enquiry-error.html or enquiry-too-long.html. */
+      enquiry-error.html or enquiry-too-long.html (zh/ and ar/ have their own).
+      Status and counter text: English, or the form's data-i18n-* templates. */
 (function () {
   "use strict";
 
@@ -46,9 +47,17 @@
   function countChars(v) { return String(v).replace(/\r\n?/g, "\n").trim().length; }
   function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
   function chars(n) { return fmt(n) + (n === 1 ? " character" : " characters"); }
-  function tooLongText(limit, over) {
-    return "Messages are limited to " + fmt(limit) + " characters. Please shorten yours" +
+  // Localised text (zh/, ar/): each form may carry data-i18n-<key> templates with {n}, {limit},
+  // {over} placeholders (numbers arrive formatted, Western digits). English is the default.
+  function say(form, key, english, vars) {
+    var tpl = form.getAttribute("data-i18n-" + key);
+    if (tpl === null) return english;
+    return tpl.replace(/\{(\w+)\}/g, function (m, k) { return vars && Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : m; });
+  }
+  function tooLongText(form, limit, over) {
+    var english = "Messages are limited to " + fmt(limit) + " characters. Please shorten yours" +
       (over > 0 ? " by " + fmt(over) : "") + ", or write to info@regenig.com.";
+    return say(form, over > 0 ? "too-long" : "too-long-plain", english, { limit: fmt(limit), over: fmt(over) });
   }
   var NEAR = 0.9; // announce from 90% of the limit
 
@@ -69,8 +78,8 @@
       clearTimeout(liveTimer);
       liveTimer = setTimeout(function () {
         live.textContent = n < limit * NEAR ? "" : over
-          ? "Your message is " + chars(n - limit) + " over the limit of " + fmt(limit) + "."
-          : chars(limit - n) + " left.";
+          ? say(form, "over", "Your message is " + chars(n - limit) + " over the limit of " + fmt(limit) + ".", { n: fmt(n - limit), limit: fmt(limit) })
+          : say(form, "left", chars(limit - n) + " left.", { n: fmt(limit - n), limit: fmt(limit) });
       }, 700);
     }
 
@@ -81,7 +90,7 @@
       num = document.createElement("span");
       var unit = document.createElement("span");
       unit.className = "sr-only";
-      unit.textContent = " characters";
+      unit.textContent = say(form, "unit", " characters");
       count.appendChild(num);
       count.appendChild(unit);
       live = document.createElement("p");
@@ -104,35 +113,35 @@
       blocked = false;
       var endpoint = form.getAttribute("data-endpoint");
       if (!endpoint) {
-        status.textContent = "Online enquiries open shortly. Until then, please write to info@regenig.com.";
+        status.textContent = say(form, "closed", "Online enquiries open shortly. Until then, please write to info@regenig.com.");
         return;
       }
       if (msg && limit > 0 && countChars(msg.value) > limit) {
-        status.textContent = tooLongText(limit, countChars(msg.value) - limit);
+        status.textContent = tooLongText(form, limit, countChars(msg.value) - limit);
         blocked = true;
         msg.focus();
         return;
       }
       if (typeof form.checkValidity === "function" && !form.checkValidity()) {
-        status.textContent = "Please complete the required fields and tick the consent box.";
+        status.textContent = say(form, "required", "Please complete the required fields and tick the consent box.");
         return;
       }
       var btn = form.querySelector("button[type=submit]");
       btn.disabled = true;
-      status.textContent = "Sending…";
+      status.textContent = say(form, "sending", "Sending…");
       fetch(endpoint, { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } })
         .then(function (r) {
           if (r.ok) {
             form.reset();
-            status.textContent = "Thank you. A coordinator will be in touch personally, in confidence.";
+            status.textContent = say(form, "sent", "Thank you. A coordinator will be in touch personally, in confidence.");
             return;
           }
           return r.json().catch(function () { return {}; }).then(function (b) { throw new Error((b && b.error) || r.status); });
         })
         .catch(function (err) {
           status.textContent = /^(message_too_long|too_large)$/.test(String(err && err.message))
-            ? tooLongText(limit || 5000, 0)
-            : "Your message could not be sent. Please write to info@regenig.com.";
+            ? tooLongText(form, limit || 5000, 0)
+            : say(form, "failed", "Your message could not be sent. Please write to info@regenig.com.");
         })
         .then(function () { btn.disabled = false; });
     });

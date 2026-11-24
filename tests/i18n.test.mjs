@@ -2,6 +2,7 @@
 // and the email to info@ (always English) says which edition sent it. Never touches the network.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { handle, HONEYPOT_FIELD, LANGS, PAGES, pickLang, pagesFor } from "../functions/api/enquiry.js";
 
 console.log = () => {};
@@ -147,5 +148,25 @@ test("the email stays English and carries a Language line (en when missing or un
       assert.match(mail.subject, /^\[Website\] (Private|Partner) enquiry — /);
       assert.match(lines[0], /^(Private|Partner) enquiry from the website\.$/);
     }
+  }
+});
+
+test("site.js: data-i18n-* templates replace the English text; missing attributes keep English", () => {
+  const src = readFileSync(new URL("../assets/js/site.js", import.meta.url), "utf8");
+  const m = src.match(/function say\(form, key, english, vars\) \{[\s\S]*?\n  \}/);
+  assert.ok(m, "site.js defines say(form, key, english, vars)");
+  const say = new Function(`${m[0]}; return say;`)();
+  const form = (attrs) => ({ getAttribute: (n) => (Object.hasOwn(attrs, n) ? attrs[n] : null) });
+  const zh = form({ "data-i18n-left": "还可输入 {n} 个字符。", "data-i18n-over": "超出 {limit} 字上限 {n} 字。", "data-i18n-sent": "谢谢。" });
+  assert.equal(say(zh, "left", "400 characters left.", { n: "400", limit: "5,000" }), "还可输入 400 个字符。");
+  assert.equal(say(zh, "over", "x", { n: "1,000", limit: "5,000" }), "超出 5,000 字上限 1,000 字。");
+  assert.equal(say(zh, "sent", "Thank you."), "谢谢。");
+  assert.equal(say(zh, "failed", "English fallback."), "English fallback.");
+  assert.equal(say(form({}), "left", "400 characters left.", { n: "400" }), "400 characters left.");
+  // unknown placeholders stay as written; prototype keys are not looked up
+  assert.equal(say(form({ "data-i18n-x": "{n} {constructor} {zzz}" }), "x", "", { n: "1" }), "1 {constructor} {zzz}");
+  // every status the forms can show goes through say()
+  for (const key of ["required", "sending", "sent", "failed", "closed", "too-long", "too-long-plain", "left", "over", "unit"]) {
+    assert.ok(src.includes(`"${key}"`), key);
   }
 });

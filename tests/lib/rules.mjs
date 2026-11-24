@@ -46,14 +46,29 @@ export const BANNED_TERMS = {
     "零风险", "无风险", "无副作用", "零副作用", "绝对安全", "100%有效", "100％有效", "百分之百",
     "见证", "好评", "患者评价", "逆转衰老", "返老还童", "抗衰老奇迹"],
   ar: ["الأفضل", "أفضل", "أحسن", "الأحسن", "الأكثر ثقة", "الأكثر تقدما", "الأكثر تقدماً", "الأول", "الرائد", "الرائدة", "رائد", "رائدة",
-    "الأرقى", "الأفخم", "الأمثل", "الأعلى", "الأقوى", "الأشهر", "الأوحد", "لا مثيل", "الأحدث", "الأمهر",
+    "الأرقى", "الأفخم", "الأمثل", "الأعلى", "الأقوى", "الأوحد", "لا مثيل", "الأحدث", "الأمهر",
     // bare (indefinite / construct) elatives: أرقى عيادة, أحدث علاج …
     "أرقى", "أمهر", "أرفع", "أعلى", "أحدث", "أفخم", "أقوى", "أشهر", "أمثل", "أعظم", "أجود", "أبرع", "أكفأ", "أميز",
-    "المعيار العالمي", "معايير عالمية", "عالمي المستوى", "عالمية المستوى", "على مستوى عالمي", "من الطراز الأول", "لا يضاهى", "منقطع النظير",
+    // …and the size / reach / speed elatives, which the shape check misses before an indefinite masculine noun
+    // (أسرع وصول) and as comparatives (أوسع من): review I2-3
+    "أكبر", "أوسع", "أبرز", "أسرع", "أعرق", "أضخم",
+    "المعيار العالمي", "معايير عالمية", "عالمي المستوى", "عالمية المستوى", "على مستوى عالمي", "من الطراز الأول", "لا يضاهى", "لا تضاهى", "منقطع النظير",
     "علاج نهائي", "شفاء", "الشفاء", "يشفي", "مضمون", "مضمونة", "نضمن", "ضمان", "نسبة نجاح", "معدل نجاح", "معدلات نجاح",
     "خال من المخاطر", "بلا مخاطر", "بدون آثار جانبية", "آمن تماما", "آمن تماماً",
     "قبل وبعد", "شهادات", "تجارب المرضى", "آراء المرضى", "عكس الشيخوخة", "إيقاف الشيخوخة"],
 };
+/* zh words that contain a banned character string but are not claims (review I2-2). Each entry is
+ * a regex source (masked before the zh scan) with its meaning. 最多 is allowed only before a
+ * number (留言最多5,000字 = "at most"), so 选择最多的诊所 ("the most chosen clinic") still fails. */
+export const ZH_BANNED_ALLOW = {
+  "最多(?=\\s*[0-9０-９一二两三四五六七八九十百千万几])": "at most + a number (a limit: 最多5,000字)",
+  "最近": "recently / within the next (最近两个工作日内)",
+  "最终": "final, eventually (最终治疗方案)",
+  "第一步": "the first step (a process step, not a ranking)",
+  "保证(?=[^，。；！？,.;!?]{0,8}保密)": "assure confidentiality (保证您的信息保密; not an outcome guarantee)",
+};
+const ZH_MASK = new RegExp(Object.keys(ZH_BANNED_ALLOW).join("|"), "g");
+
 const AR_STRIP = (s) => s.normalize("NFC").replace(/[\u064B-\u065F\u0670\u0640]/g, ""); // diacritics + tatweel (hamza kept)
 const AR_FOLD = (s) => AR_STRIP(s).replace(/[\u0622\u0623\u0625]/g, "\u0627");
 const AR_WORDS = (s) => s.split(/[^\u0621-\u064A\u0671-\u06D3]+/).filter(Boolean);
@@ -74,7 +89,18 @@ export const AR_ELATIVE_ALLOW = {
   "أنتم": "you (pl.)", "أنها": "that it", "أننا": "that we", "أنهم": "that they",
   "أقصى": "maximum (الحد الأقصى: the message limit)", "أحرف": "letters/characters (plural of حرف: عدد الأحرف)",
   "أطلب": "I request", "اطلب": "request (imperative)", "أرسل": "send", "أكمل": "complete",
+  // ordinary plurals / words of the elative shape a native reviewer may need (review I2-2)
+  "أيام": "days (أيام العمل: working days; الأيام)", "أخرى": "other, fem. (الخدمات الأخرى)", "أمور": "matters (الأمور العملية)",
+  "أدنى": "minimum (الحد الأدنى; the mirror of الحد الأقصى)", "أوجه": "aspects (أوجه التعاون)",
+  "أصول": "proper procedures / norms (وفق الأصول المهنية)", "أجور": "fees, wages (الأجور والرسوم)", "أيدي": "hands (أيدي الأطباء)",
+  "أشهر": "months (الأشهر الثلاثة). The superlative 'most famous' stays caught: bare أشهر is on BANNED_TERMS, and الأشهر right after a definite noun (العيادة الأشهر) is caught by AR_AMBIGUOUS",
+  "أدخل": "enter (imperative)", "أضف": "add (imperative)", "أرفق": "attach (imperative)",
 };
+// Allowed words that are ALSO a superlative when they qualify a definite noun: العيادة الأشهر = "the most famous clinic".
+const AR_AMBIGUOUS = new Set(["أشهر"]);
+// أكثر + a definite noun is a quantity (أكثر المرضى = "most patients"); its quality form is caught by the
+// أكثر + quality-noun rule (أكثر البوابات موثوقية)
+const AR_QUANTITY = new Set(["أكثر"]);
 const AR_ELATIVE_DOUBLED = new Set(["أهم", "أدق", "أعز", "أشد", "أحق"]);
 const AR_QUALITY_NOUNS = new Set(["موثوقية", "ثقة", "تقدما", "تقدم", "امانا", "امان", "فعالية", "نجاحا", "خبرة", "تميزا", "تميز",
   "شهرة", "رقيا", "تطورا", "احترافية", "كفاءة", "جودة", "دقة", "تخصصا", "فخامة"].map((w) => AR_FOLD(w)));
@@ -99,8 +125,15 @@ export function arElativeHits(text) {
     for (const c of arCores(w)) {
       const def = c.startsWith("\u0627\u0644") ? c.slice(2) : null;
       if (def !== null && isElative(def)) { hits.push(w); return; }                    // الأرقى
-      if (def === null && isElative(c) && i + 1 < words.length && isDefiniteNoun(words[i + 1])) {
+      if (def !== null && AR_AMBIGUOUS.has(def) && i > 0 && isDefiniteNoun(words[i - 1])) { hits.push(`${words[i - 1]} ${w}`); return; } // العيادة الأشهر
+      if (def === null && isElative(c) && !AR_QUANTITY.has(c) && i + 1 < words.length && isDefiniteNoun(words[i + 1])) {
         hits.push(`${w} ${words[i + 1]}`); return;                                         // أرقى العيادات
+      }
+      // elative (written with hamza: form-I imperatives such as اترك start with a bare alef) + an indefinite
+      // feminine noun: أوسع شبكة, أبرز عيادة, أكبر مجموعة (review I2-3)
+      if (def === null && c.startsWith("\u0623") && isElative(c) && i + 1 < words.length && !isDefiniteNoun(words[i + 1])
+        && /\u0629$/.test(words[i + 1]) && words[i + 1].length > 2) {
+        hits.push(`${w} ${words[i + 1]}`); return;                                         // أوسع شبكة
       }
       if (AR_FOLD(def === null ? c : def) === "اكثر") {                                    // (ال)أكثر … موثوقية
         const q = words.slice(i + 1, i + 4).find((n) => arCores(AR_FOLD(n)).some((x) => AR_QUALITY_NOUNS.has(x)));
@@ -114,7 +147,7 @@ export function arElativeHits(text) {
 /** Banned terms found in visible text for an edition (empty array = clean). */
 export function bannedTermsIn(text, edition) {
   const terms = BANNED_TERMS[edition] || [];
-  if (edition === "zh") return terms.filter((t) => text.includes(t));
+  if (edition === "zh") { const masked = text.replace(ZH_MASK, "□"); return terms.filter((t) => masked.includes(t)); }
   if (edition === "ar") {
     const folded = AR_FOLD(text);
     const words = AR_WORDS(folded);
@@ -134,9 +167,20 @@ export function bannedTermsIn(text, edition) {
  * 医疗机构 / 医疗服务机构 is the regulated term for a provider of diagnosis and treatment, so
  * no zh page may use it (or the provider synonyms) for RIG. The partner clinics may be called
  * 合作医疗机构. Arabic: مؤسسة طبية / منشأة صحية / مقدم رعاية صحية … are the provider terms;
- * a partner (… شريكة) is allowed. RIG's own terms: zh 私人医疗服务中介, ar وكالة رعاية صحية خاصة. */
+ * a partner (… شريكة) is allowed. RIG's own terms: zh 私人医疗协调机构, ar وكالة رعاية صحية خاصة.
+ * zh third-party uses are allowed by the words directly before the term (ZH_PROVIDER_CONTEXT, review
+ * I2-2): 合作/合作伙伴医疗机构, 持牌医疗机构, 医院、诊所等医疗机构, 与日本医疗机构合作. A clause that also
+ * says 是 / 一家 / 作为 / 属于 stays a self-description and fails (一家持牌医疗机构), except after
+ * 合作 (partner clinics are never RIG). */
+export const RIG_TERMS = { zh: "私人医疗协调机构", ar: "وكالة رعاية صحية خاصة" };
+export const ZH_PROVIDER_CONTEXT = {
+  "合作": "partner (合作医疗机构)", "合作的": "partnered (合作的医疗机构)", "合作伙伴": "partner (合作伙伴医疗机构)",
+  "持牌": "licensed (日本的持牌医疗机构)", "等": "enumeration (医院、诊所等医疗机构)",
+  "与": "with (与日本医疗机构合作)", "和": "and / with", "同": "with",
+};
+const ZH_CONTEXT_RE = new RegExp(`(?:${Object.keys(ZH_PROVIDER_CONTEXT).sort((a, b) => b.length - a.length).join("|")})(?:日本|东京)?的?$`);
 export const PROVIDER_TERMS = {
-  zh: /(?<!合作)(?<!合作的)(医疗服务机构|医疗机构|诊疗机构|医疗服务提供者|医疗服务提供方|医疗服务提供商|医疗服务商|医疗提供者|医疗服务供应商)/g,
+  zh: /(医疗服务机构|医疗机构|诊疗机构|医疗服务提供者|医疗服务提供方|医疗服务提供商|医疗服务商|医疗提供者|医疗服务供应商)/g,
   ar: /(?:^|\s)(?:[وفبكل])?(?:ال)?(مؤسسة (?:ال)?(?:طبية|صحية|علاجية)|منشاة (?:ال)?(?:طبية|صحية|علاجية)|مرفق (?:ال)?(?:طبي|صحي)|مقدم (?:ال)?(?:رعاية|خدمات) (?:ال)?(?:صحية|طبية)|مقدم (?:ال)?رعاية|مزود (?:ال)?(?:رعاية|خدمات) (?:ال)?(?:صحية|طبية))(?! (?:ال)?شريك)/g,
 };
 /** Medical-provider self-descriptions found in visible text (empty array = clean). */
@@ -144,7 +188,12 @@ export function providerTermsIn(text, edition) {
   const re = PROVIDER_TERMS[edition];
   if (!re) return [];
   const t = edition === "ar" ? AR_FOLD(text).replace(/\s+/g, " ") : text;
-  return [...t.matchAll(re)].map((m) => m[1]);
+  return [...t.matchAll(re)].filter((m) => {
+    if (edition !== "zh") return true;
+    const clause = t.slice(0, m.index).split(/[，。；：、！？,.;:!?\s]/).pop();
+    if (/(?:合作|合作的|合作伙伴)$/.test(clause)) return false; // partner clinics, always (欢迎贵院作为合作医疗机构加入)
+    return !(ZH_CONTEXT_RE.test(clause) && !/是|一家|作为|身为|属于/.test(clause));
+  }).map((m) => m[1]);
 }
 
 export const REQUIRED_CSP = {

@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp, headersForUrl, PAGES_DEV_NOINDEX_PATTERNS,
-  EDITIONS, TRANSLATED, STATUS_NAMES, editionOf, bannedTermsIn, BANNED_TERMS, providerTermsIn, AR_ELATIVE_ALLOW } from "./lib/rules.mjs";
+  EDITIONS, TRANSLATED, STATUS_NAMES, editionOf, bannedTermsIn, BANNED_TERMS, providerTermsIn, AR_ELATIVE_ALLOW, RIG_TERMS, ZH_BANNED_ALLOW, ZH_PROVIDER_CONTEXT } from "./lib/rules.mjs";
 
 
 
@@ -413,6 +413,8 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   const nonStub = htmlFiles.filter((f) => !STUBS.includes(f));
 
   // the banned-term scanner is not vacuous
+  // …and sees through a zh heading's <wbr> word boundaries (review I2-1: pins the <wbr> strip above)
+  check("visibleText() drops <wbr> without a gap, so 顶<wbr>级 is still caught", bannedTermsIn(visibleText("<h1>顶<wbr>级</h1><p>最<wbr/>先进</p>"), "zh").join() === "最,顶级");
   check("banned-term scan catches zh superlatives", bannedTermsIn("这是最好的诊所，顶级服务", "zh").length === 2);
   check("banned-term scan catches ar superlatives (prefix, diacritics, alef forms)", ["نحن الأفضل", "والأفضل", "الأفضلُ", "الافضل", "عيادة رائدة", "نتائج مضمونة", "قبل وبعد"].every((x) => bannedTermsIn(x, "ar").length > 0));
   check("banned-term scan leaves ordinary ar words alone", bannedTermsIn("أولى تخصّصاتنا، من أول حديث حتى المتابعة", "ar").length === 0);
@@ -430,14 +432,33 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   // …while the elative-shaped words the pages use for other meanings stay allowed
   check("banned-term scan allows ar non-superlatives of the elative shape (الحد الأقصى، عدد الأحرف، أحد المنسّقين، أكثر من)",
     bannedTermsIn("الحد الأقصى للرسائل 5,000 حرف، عدد الأحرف المتبقية؛ سيتواصل معكم أحد المنسّقين؛ أكثر من عيادة؛ من أجل المرضى", "ar").length === 0);
+  // ordinary words a native reviewer may need are not flagged (review I2-2); elative + indefinite noun is (I2-3)
+  for (const x of ["سنردّ عليكم خلال أيام العمل المقبلة", "خلال الأيام القليلة المقبلة", "وغيرها من الخدمات الأخرى", "الحد الأدنى من البيانات",
+    "خلال الأشهر الثلاثة الأولى", "نتابع معكم جميع الأمور العملية", "وفق الأصول المهنية", "أوجه التعاون مع العيادات", "يأتي أكثر المرضى من ماليزيا",
+    "الأجور والرسوم", "أيدي الأطباء", "في أقرب وقت ممكن", "اترك رسالة"]) {
+    check(`banned-term scan allows ordinary ar "${x}"`, bannedTermsIn(x, "ar").length === 0, bannedTermsIn(x, "ar").join(", "));
+  }
+  for (const x of ["أوسع شبكة عيادات في اليابان", "أكبر شبكة من العيادات", "أبرز عيادة في طوكيو", "أسرع وصول إلى العلاج", "أكبر مجموعة طبية",
+    "أجمل تجربة", "العيادة الأشهر", "أشهر العيادات", "خدمة لا تُضاهى"]) {
+    check(`banned-term scan catches ar superlative "${x}"`, bannedTermsIn(x, "ar").length > 0);
+  }
+  for (const x of ["留言最多5,000字", "我们会在最近两个工作日内回复", "最终治疗方案由医师决定", "第一步：初次沟通", "我们保证您的信息保密"]) {
+    check(`banned-term scan allows ordinary zh "${x}"`, bannedTermsIn(x, "zh").length === 0, bannedTermsIn(x, "zh").join(", "));
+  }
+  for (const x of ["选择最多的诊所", "最先进的疗法", "第一家诊所", "保证疗效"]) check(`banned-term scan catches zh "${x}"`, bannedTermsIn(x, "zh").length > 0);
+  check("zh banned-term and provider allow-lists: every entry says what it means", [...Object.values(ZH_BANNED_ALLOW), ...Object.values(ZH_PROVIDER_CONTEXT)].every((v) => typeof v === "string" && v.length > 2));
   check("ar elative allow-list: every entry says what the word means", Object.values(AR_ELATIVE_ALLOW).every((v) => typeof v === "string" && v.length > 2));
   // RIG is an agency, never a medical provider (review I1-1)
   for (const [x, ed] of [["一家私人医疗服务机构", "zh"], ["我们是医疗机构", "zh"], ["一家诊疗机构", "zh"], ["医疗服务提供者", "zh"],
+    ["一家持牌医疗机构", "zh"], ["Regenesis 是日本的持牌医疗机构", "zh"], ["作为持牌医疗机构", "zh"],
     ["نحن مؤسسة طبية خاصة", "ar"], ["مقدّم رعاية صحية", "ar"], ["منشأة صحية خاصة", "ar"], ["مقدم الخدمات الطبية", "ar"]]) {
     check(`provider-term scan catches ${ed} "${x}"`, providerTermsIn(x, ed).length > 0);
   }
+  for (const x of ["面向医院、诊所等医疗机构", "日本的持牌医疗机构", "我们与日本医疗机构合作", "合作伙伴医疗机构"]) {
+    check(`provider-term scan allows third-party zh "${x}"`, providerTermsIn(x, "zh").length === 0);
+  }
   check("provider-term scan allows partner clinics (合作医疗机构 / مؤسسة طبية شريكة) and RIG's own terms",
-    providerTermsIn("我们的合作医疗机构；一家私人医疗服务中介", "zh").length === 0 && providerTermsIn("مؤسسة طبية شريكة؛ وكالة رعاية صحية خاصة؛ المؤسسة", "ar").length === 0);
+    providerTermsIn("我们的合作医疗机构；一家私人医疗协调机构", "zh").length === 0 && providerTermsIn("مؤسسة طبية شريكة؛ وكالة رعاية صحية خاصة؛ المؤسسة", "ar").length === 0);
 
   for (const file of nonStub) {
     const ed = editionOf(file);
@@ -498,12 +519,26 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   const FIDELITY = {
     "zh/index.html": { must: ["依照日本再生医疗相关法规提供"], never: ["严格", "严苛", "监管体系约束"] },
     "ar/index.html": { must: ["وفق أنظمة الطب التجديدي في اليابان"], never: ["الصارمة", "صارمة", "الرقابة التنظيمية"] },
-    "zh/about.html": { must: ["以精准、细致与严谨的医疗规范而著称", "日本的专科医疗"], never: ["先进医疗", "高标准", "世界标准", "世界的标准"] },
+    // "medical discipline", not "standards" (review I2-4): 规范 brought the softened "world's standard" back
+    "zh/about.html": { must: ["以精准、细致与医疗上的严谨而著称", "日本的专科医疗"], never: ["先进医疗", "高标准", "世界标准", "世界的标准", "规范"] },
     // "healthcare coordinators" are people (review I1-4), as in ar منسّقي الرعاية الصحية
     "zh/partners.html": { must: ["医疗协调员"], never: ["医疗协调机构"] },
     "ar/partners.html": { must: ["منسقي الرعاية الصحية"], never: [] },
     "ar/about.html": { must: ["عرفت اليابان بالدقة والعناية والانضباط الطبي", "طبها التخصصي"], never: ["طبها المتقدم", "معايير رفيعة", "المعيار العالمي"] },
   };
+  // RIG's own term (parent decision, c2: zh 私人医疗协调机构) in the home description, og:description and lede
+  for (const ed of ["zh", "ar"]) {
+    const html = pages[`${ed}/index.html`] || "";
+    const meta = (re) => decode((html.match(re) || [])[1] || "");
+    const places = { description: meta(/<meta name="description" content="([^"]*)"/), "og:description": meta(/<meta property="og:description" content="([^"]*)"/), lede: meta(/<p class="lede">([^<]*)<\/p>/) };
+    for (const [where, v] of Object.entries(places)) check(`${ed}/index.html: ${where} calls RIG ${RIG_TERMS[ed]}`, v.includes(RIG_TERMS[ed]), v);
+  }
+  check("zh/index.html: the old RIG term 中介 is gone", !visibleText(pages["zh/index.html"] || "").includes("中介"));
+  // every softened English line keeps its COPY marker in each translation (review I2-5)
+  for (const page of TRANSLATED) {
+    const n = (f) => (read(f).match(/<!-- COPY:/g) || []).length;
+    for (const ed of ["zh", "ar"]) check(`${ed}/${page}: COPY markers match the English (${n(page)})`, n(`${ed}/${page}`) === n(page), String(n(`${ed}/${page}`)));
+  }
   const unmark = (s) => s.replace(/[\u064B-\u065F\u0670\u0640]/g, "");
   for (const [file, { must, never }] of Object.entries(FIDELITY)) {
     const text = unmark(visibleText(pages[file] || ""));

@@ -38,11 +38,13 @@ English-only pages link to the other editions' home; `aria-current` marks the ac
   with a `Language:` line. `site.js` reads its status and counter text from the form's `data-i18n-*` attributes (English default).
 - Content rules apply in every language; `tests/static-check.mjs` scans zh/ar pages for a banned-term list per language
   (`BANNED_TERMS` in `tests/lib/rules.mjs`). Arabic superlatives are also caught by shape (the elative أفعل in
-  construct, e.g. أرقى العيادات, or with أكثر + a quality noun); legitimate words of that shape go in
-  `AR_ELATIVE_ALLOW` with their meaning.
-- RIG is an agency, never a medical provider, in every language: zh 私人医疗服务中介 (never 医疗机构 / 医疗服务机构,
-  which name a regulated provider; partner clinics may be 合作医疗机构), ar وكالة رعاية صحية خاصة (never مؤسسة طبية /
-  مقدم رعاية صحية). `PROVIDER_TERMS` in `tests/lib/rules.mjs` enforces it.
+  construct, e.g. أرقى العيادات, before an indefinite feminine noun, e.g. أوسع شبكة, or with أكثر + a quality noun);
+  legitimate words of that shape go in `AR_ELATIVE_ALLOW` with their meaning.
+- When the native reviewer's wording is flagged but is not a claim: allow-list it with its meaning (`AR_ELATIVE_ALLOW`,
+  `ZH_BANNED_ALLOW`, `ZH_PROVIDER_CONTEXT`) and add it to the tests. Never reword the reviewer's text just to pass.
+- RIG is an agency, never a medical provider, in every language: zh 私人医疗协调机构 (never 医疗机构 / 医疗服务机构 for RIG,
+  which name a regulated provider; third parties may be 合作医疗机构, 持牌医疗机构, 医院、诊所等医疗机构), ar وكالة رعاية صحية خاصة
+  (never مؤسسة طبية / مقدم رعاية صحية). `PROVIDER_TERMS` / `RIG_TERMS` in `tests/lib/rules.mjs` enforce it.
 - zh display headings (h1/h2) carry `<wbr>` between words; CSS `word-break: keep-all` lets them break only there.
   ar free-text fields carry `dir="auto"`.
 - Cloudflare Pages serves the nearest `404.html` up the tree, so `/zh/…` and `/ar/…` misses get `zh/404.html` / `ar/404.html`.

@@ -158,7 +158,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 
 .lang { display: flex; gap: 0.7rem; align-items: center; font-size: 0.72rem; color: var(--ivory-4); }
 .lang [aria-current="true"] { color: var(--ivory); }
-.lang .pending { cursor: default; color: var(--ivory-3); }
+.nav-menu .lang a { letter-spacing: 0.08em; }
 .lang [lang="ar"] { font-size: 0.86rem; }
 .lang .sep { opacity: 0.5; }
 
@@ -336,6 +336,47 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
 /* ============ redirect stubs ============ */
 .moved { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 2rem; }
 
+/* ============ Chinese (zh-Hans) and Arabic (ar, RTL) editions ============ */
+/* Chinese: system fonts only (no multi-MB CJK download). Cormorant / Inter stay first in
+   each stack because their unicode-range is Latin: they draw the Latin letters and digits,
+   the system CJK face draws the Han characters and full-width punctuation. */
+html:lang(zh) {
+  --cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei";
+  --serif: "Cormorant Garamond", var(--cjk), serif;
+  --sans: "Inter", var(--cjk), sans-serif;
+}
+/* Arabic: self-hosted Noto Naskh Arabic (fonts.css), Latin still from Cormorant / Inter. */
+html:lang(ar) {
+  --serif: "Cormorant Garamond", "Noto Naskh Arabic", "Geeza Pro", "Times New Roman", serif;
+  --sans: "Inter", "Noto Naskh Arabic", "Geeza Pro", Tahoma, sans-serif;
+}
+/* Neither script has an italic: the serif-italic accents become upright. */
+html:lang(zh) :is(.lede, .note, .slogan, .you-get, .treatment),
+html:lang(ar) :is(.lede, .note, .slogan, .you-get, .treatment) { font-style: normal; }
+/* Small uppercase tracked labels are a Latin device. Chinese: larger, lightly tracked. */
+html:lang(zh) :is(.eyebrow, .btn, .link-arrow, .nav-menu a, .chips li, .leader .title, .field label, .footer-line, .footer-nav a) {
+  letter-spacing: 0.12em; font-size: 0.8rem;
+}
+html:lang(zh) body { line-height: 1.85; }
+html:lang(zh) :is(h1, h2) { line-height: 1.3; letter-spacing: 0.04em; }
+html:lang(zh) h3 { line-height: 1.4; }
+html:lang(zh) .lede { line-height: 1.6; }
+html:lang(zh) .page-hero h1 { max-width: 13em; }
+/* Arabic: no letter-spacing on Arabic text (it breaks the joins); Naskh needs size and leading. */
+html:lang(ar) :is(.eyebrow, .btn, .link-arrow, .nav-menu a, .chips li, .leader .title, .field label, .footer-line, .footer-nav a) {
+  letter-spacing: 0; font-size: 0.9rem;
+}
+html:lang(ar) :is(h1, h2, h3) { letter-spacing: 0; line-height: 1.5; }
+html:lang(ar) body { font-size: 1.06rem; line-height: 1.9; }
+html:lang(ar) .lede { line-height: 1.7; }
+html:lang(ar) .page-hero h1 { max-width: 18em; }
+html:lang(ar) .footer-legal p { font-size: 0.88rem; }
+/* RTL: the Latin wordmark keeps its LTR tracking balance; e-mail and phone entries read LTR. */
+[dir="rtl"] :is(.wordmark, .hero .brandline) { direction: ltr; }
+[dir="rtl"] .field input:is([type="email"], [type="tel"]) { direction: ltr; text-align: right; }
+/* Everything else mirrors through logical properties: the nav and switcher order, the step
+   numerals (grid), the form, and the arrow (transform in .link-arrow above). */
+
 /* ============ breakpoints (mobile first) ============ */
 @media (min-width: 720px) {
   .leaders { grid-template-columns: repeat(3, 1fr); }
@@ -365,6 +406,7 @@ h3 { font-size: clamp(1.4rem, 2.4vw, 1.75rem); line-height: 1.2; font-weight: 40
   .nav-menu li a { display: block; padding-block: 0.95rem; border-block-end: 1px solid var(--line); }
   .nav-menu .nav-cta { border: 0; border-block-end: 1px solid var(--line); padding-inline: 0; }
   .nav-menu .lang { padding-block-start: 1.1rem; }
+  .nav-menu .lang a { display: inline-block; padding-block: 0.6rem; border: 0; }
   .nav-toggle:checked ~ .nav-menu { display: flex; }
   .site-header:has(.nav-toggle:checked) { background: rgba(10, 13, 20, 0.98); }
 }

@@ -359,6 +359,10 @@ html:lang(zh) :is(.eyebrow, .btn, .link-arrow, .nav-menu a, .chips li, .leader .
 }
 html:lang(zh) body { line-height: 1.85; }
 html:lang(zh) :is(h1, h2) { line-height: 1.3; letter-spacing: 0.04em; }
+/* Display headings break between words, not inside them: keep-all removes the break between
+   every pair of Han characters, so lines break only at the <wbr> word boundaries in the markup
+   and after punctuation; overflow-wrap is the safety net if a word ever would not fit. */
+html:lang(zh) :is(h1, h2) { word-break: keep-all; overflow-wrap: anywhere; }
 html:lang(zh) h3 { line-height: 1.4; }
 html:lang(zh) .lede { line-height: 1.6; }
 html:lang(zh) .page-hero h1 { max-width: 13em; }

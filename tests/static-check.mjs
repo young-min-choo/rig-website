@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp, headersForUrl, PAGES_DEV_NOINDEX_PATTERNS,
-  EDITIONS, TRANSLATED, STATUS_NAMES, editionOf, bannedTermsIn, BANNED_TERMS } from "./lib/rules.mjs";
+  EDITIONS, TRANSLATED, STATUS_NAMES, editionOf, bannedTermsIn, BANNED_TERMS, providerTermsIn, AR_ELATIVE_ALLOW } from "./lib/rules.mjs";
 
 
 
@@ -404,7 +404,9 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   const I18N_KEYS = ["required", "sending", "sent", "failed", "closed", "too-long", "too-long-plain", "left", "over", "unit"];
   const PLACEHOLDERS = { "too-long": ["{limit}", "{over}"], "too-long-plain": ["{limit}"], left: ["{n}"], over: ["{n}", "{limit}"] };
   const visibleText = (html) => {
-    const body = html.replace(/<script\b[\s\S]*?<\/script>/gi, " ");
+    // <wbr> marks a word boundary inside a zh heading, not a gap: drop it before the tags, or
+    // 顶<wbr>级 would read as "顶 级" and slip past the scan
+    const body = html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<wbr\s*\/?>/gi, "");
     const attrText = [...body.matchAll(/\s(?:alt|aria-label|title|content|data-i18n-[a-z-]+)="([^"]*)"/g)].map((m) => decode(m[1]));
     return [body.replace(/<[^>]+>/g, " "), ...attrText].join(" ");
   };
@@ -414,6 +416,28 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   check("banned-term scan catches zh superlatives", bannedTermsIn("这是最好的诊所，顶级服务", "zh").length === 2);
   check("banned-term scan catches ar superlatives (prefix, diacritics, alef forms)", ["نحن الأفضل", "والأفضل", "الأفضلُ", "الافضل", "عيادة رائدة", "نتائج مضمونة", "قبل وبعد"].every((x) => bannedTermsIn(x, "ar").length > 0));
   check("banned-term scan leaves ordinary ar words alone", bannedTermsIn("أولى تخصّصاتنا، من أول حديث حتى المتابعة", "ar").length === 0);
+  // zh: the PRC ad-law absolutes and safety guarantees (review I1-3)
+  for (const x of ["首选", "极致", "尖端", "唯一", "独家", "首家", "国家级", "金牌", "王牌", "冠军", "No.1", "零风险", "无副作用", "绝对安全", "100%有效"]) {
+    check(`banned-term scan catches zh ${x}`, bannedTermsIn(`我们是${x}的服务`, "zh").length > 0);
+  }
+  // ar: the superlative by shape (review I1-2). The first two are the brief's own banned phrases
+  // ("Japan's finest licensed clinics", "most trusted gateway") as a translator would render them.
+  for (const x of ["أرقى العيادات المرخّصة في اليابان", "أكثر البوابات موثوقية", "أكثر البوابات ثقةً", "الأكثر موثوقية", "الأكثر تقدّماً",
+    "أكثر العيادات أماناً", "أمهر الأطباء", "أرفع المعايير", "أعلى المعايير", "أحدث العلاجات", "وأحدث العلاجات", "بأفضل الأطباء",
+    "أهم العيادات", "الأرقى", "للأرقى", "أحدث علاج", "عيادات عالمية المستوى", "رعاية عالمية المستوى"]) {
+    check(`banned-term scan catches ar superlative "${x}"`, bannedTermsIn(x, "ar").length > 0);
+  }
+  // …while the elative-shaped words the pages use for other meanings stay allowed
+  check("banned-term scan allows ar non-superlatives of the elative shape (الحد الأقصى، عدد الأحرف، أحد المنسّقين، أكثر من)",
+    bannedTermsIn("الحد الأقصى للرسائل 5,000 حرف، عدد الأحرف المتبقية؛ سيتواصل معكم أحد المنسّقين؛ أكثر من عيادة؛ من أجل المرضى", "ar").length === 0);
+  check("ar elative allow-list: every entry says what the word means", Object.values(AR_ELATIVE_ALLOW).every((v) => typeof v === "string" && v.length > 2));
+  // RIG is an agency, never a medical provider (review I1-1)
+  for (const [x, ed] of [["一家私人医疗服务机构", "zh"], ["我们是医疗机构", "zh"], ["一家诊疗机构", "zh"], ["医疗服务提供者", "zh"],
+    ["نحن مؤسسة طبية خاصة", "ar"], ["مقدّم رعاية صحية", "ar"], ["منشأة صحية خاصة", "ar"], ["مقدم الخدمات الطبية", "ar"]]) {
+    check(`provider-term scan catches ${ed} "${x}"`, providerTermsIn(x, ed).length > 0);
+  }
+  check("provider-term scan allows partner clinics (合作医疗机构 / مؤسسة طبية شريكة) and RIG's own terms",
+    providerTermsIn("我们的合作医疗机构；一家私人医疗服务中介", "zh").length === 0 && providerTermsIn("مؤسسة طبية شريكة؛ وكالة رعاية صحية خاصة؛ المؤسسة", "ar").length === 0);
 
   for (const file of nonStub) {
     const ed = editionOf(file);
@@ -437,6 +461,20 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
     // content rules in the page's language
     const hits = bannedTermsIn(visibleText(html), ed);
     check(`${file}: no banned terms (${ed}: ${BANNED_TERMS[ed].length} terms)`, hits.length === 0, hits.join(", "));
+    const prov = providerTermsIn(visibleText(html), ed);
+    check(`${file}: RIG not described as a medical provider (${ed})`, prov.length === 0, prov.join(", "));
+    // ar: free-text fields take dir="auto", so a Latin or Chinese entry keeps its own direction
+    if (ed === "ar") {
+      const free = [...tags(html, "input").filter((t) => !t.type && t.name !== "website"), ...tags(html, "textarea")];
+      for (const f of free) check(`${file}: #${f.id} has dir="auto"`, f.dir === "auto", f.dir);
+    }
+    // zh: display headings carry <wbr> word boundaries (CSS keep-all breaks only there)
+    if (ed === "zh") {
+      for (const m of raw.matchAll(/<(h[12])\b[^>]*>([\s\S]*?)<\/\1>/g)) {
+        const han = (m[2].replace(/<[^>]+>/g, "").match(/[\u4e00-\u9fff]/g) || []).length;
+        if (han > 4) check(`${file}: zh ${m[1]} has <wbr> word boundaries`, /<wbr>/.test(m[2]), m[2]);
+      }
+    }
     check(`${file}: Western digits only (no Arabic-Indic numerals)`, !/[\u0660-\u0669\u06F0-\u06F9]/.test(visibleText(html)));
     // localised form text
     for (const form of tags(html, "form")) {
@@ -452,6 +490,23 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
     check(`${file}: English form uses site.js defaults (no data-i18n-*)`, !tags(pages[file], "form").some((f) => Object.keys(f).some((k) => k.startsWith("data-i18n-"))));
   }
   function formPages(files) { return files.filter((f) => /(^|\/)(index|partners)\.html$/.test(f)); }
+
+  // fidelity to the softened English (Choo, 11/24): the RM paragraph says "provided under Japan's
+  // regenerative medicine regulations" (no "strict"); the first Our Story paragraph says Japan "has
+  // been known for" precision, care and medical discipline and calls its medicine "specialist"
+  // (no "most advanced", no "set the world's standard"). Compared without Arabic diacritics.
+  const FIDELITY = {
+    "zh/index.html": { must: ["依照日本再生医疗相关法规提供"], never: ["严格", "严苛", "监管体系约束"] },
+    "ar/index.html": { must: ["وفق أنظمة الطب التجديدي في اليابان"], never: ["الصارمة", "صارمة", "الرقابة التنظيمية"] },
+    "zh/about.html": { must: ["以精准、细致与严谨的医疗规范而著称", "日本的专科医疗"], never: ["先进医疗", "高标准", "世界标准", "世界的标准"] },
+    "ar/about.html": { must: ["عرفت اليابان بالدقة والعناية والانضباط الطبي", "طبها التخصصي"], never: ["طبها المتقدم", "معايير رفيعة", "المعيار العالمي"] },
+  };
+  const unmark = (s) => s.replace(/[\u064B-\u065F\u0670\u0640]/g, "");
+  for (const [file, { must, never }] of Object.entries(FIDELITY)) {
+    const text = unmark(visibleText(pages[file] || ""));
+    for (const m of must) check(`${file}: follows the softened English ("${m}")`, text.includes(unmark(m)));
+    for (const n of never) check(`${file}: no stronger claim than the English ("${n}")`, !text.includes(unmark(n)));
+  }
 
   // language switcher: real links, one per edition, aria-current on the page's own language
   const SAME = new Set([...TRANSLATED, ...STATUS_NAMES.filter((n) => n !== "404.html")]);

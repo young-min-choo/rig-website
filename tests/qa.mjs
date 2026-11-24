@@ -341,6 +341,42 @@ for (const vp of VIEWPORTS) {
         const body = await r.text();
         check(`${id}: switcher ${a.hreflang} → ${new URL(a.href).pathname} (200, lang=${a.hreflang})`, r.status() === 200 && new RegExp(`<html lang="${a.hreflang}"`).test(body), String(r.status()));
       }
+      // zh display headings break only between words: at a <wbr>, a space or after punctuation,
+      // never between two Han characters of one word (开 / 启). Lines are found per character.
+      if (code === "zh") {
+        const hb = await page.evaluate(() => {
+          const out = { n: 0, bad: [] };
+          for (const h of document.querySelectorAll("main :is(h1, h2):not(.brandline)")) {
+            out.n++;
+            const chars = [];
+            let boundary = false;
+            const walk = (n) => {
+              for (const c of n.childNodes) {
+                if (c.nodeType === 3) for (let i = 0; i < c.data.length; i++) { chars.push({ node: c, i, ch: c.data[i], boundary }); boundary = false; }
+                else if (c.nodeName === "WBR") boundary = true;
+                else walk(c);
+              }
+            };
+            walk(h);
+            const range = document.createRange();
+            let prevTop = null;
+            chars.forEach((c, k) => {
+              range.setStart(c.node, c.i); range.setEnd(c.node, c.i + 1);
+              const r = range.getClientRects()[0];
+              if (!r || !r.width) return;
+              if (prevTop !== null && r.top > prevTop + r.height / 2) {
+                const prev = chars[k - 1].ch;
+                if (!(c.boundary || /[\s，。、；：！？）」』》·—]/.test(prev) || /\s/.test(c.ch))) {
+                  out.bad.push(`${h.textContent.slice(0, k)} / ${h.textContent.slice(k)}`);
+                }
+              }
+              prevTop = r.top;
+            });
+          }
+          return out;
+        });
+        check(`${id}: zh headings break only between words (${hb.n} headings)`, hb.bad.length === 0 && hb.n > 0, hb.bad.join(" | "));
+      }
     }
 
     // keyboard focus: tab through every stop; links/buttons need a visible outline
@@ -615,6 +651,19 @@ for (const vp of VIEWPORTS) {
     await page.waitForTimeout(150);
     check(`${id}: empty submit shows the localised required-fields status`, (await status.textContent()) === T.required, await status.textContent());
     check(`${id}: empty submit sends nothing`, apiHits.length === before);
+    if (lang === "ar") {
+      // free-text fields follow what is typed (dir="auto"): "Hello." stays "Hello." in an RTL form
+      const dirOf = (sel) => page.evaluate((s) => (document.querySelector(s).matches(":dir(ltr)") ? "ltr" : "rtl"), sel);
+      await page.fill(`#${prefix}-msg`, "Hello.");
+      await page.fill(`#${prefix}-name`, "Sarah Ahmed");
+      const latin = [await dirOf(`#${prefix}-msg`), await dirOf(`#${prefix}-name`)];
+      await page.fill(`#${prefix}-msg`, fields.msg);
+      await page.fill(`#${prefix}-name`, fields.name);
+      const arabic = [await dirOf(`#${prefix}-msg`), await dirOf(`#${prefix}-name`)];
+      check(`${id}: free-text fields take the typed text's direction (Latin ltr, Arabic rtl)`, latin.join() === "ltr,ltr" && arabic.join() === "rtl,rtl", `${latin} / ${arabic}`);
+      await page.fill(`#${prefix}-msg`, "");
+      await page.fill(`#${prefix}-name`, "");
+    }
 
     const num = () => page.evaluate((p) => { const n = document.querySelector(`#${p}-msg-count > span`); return n ? n.textContent : null; }, prefix);
     const unit = await page.evaluate((p) => { const n = document.querySelector(`#${p}-msg-count .sr-only`); return n ? n.textContent : null; }, prefix);

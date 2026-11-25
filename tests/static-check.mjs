@@ -13,7 +13,8 @@ import { join, dirname, resolve, relative, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp, headersForUrl, PAGES_DEV_NOINDEX_PATTERNS } from "./lib/rules.mjs";
+import { SITE, REAL_PAGES, STATUS_PAGES, STUBS, REQUIRED_CSP, parseHeaders, parseCsp, headersForUrl, PAGES_DEV_NOINDEX_PATTERNS,
+  EDITIONS, TRANSLATED, STATUS_NAMES, editionOf, bannedTermsIn, BANNED_TERMS, providerTermsIn, AR_ELATIVE_ALLOW, RIG_TERMS, ZH_BANNED_ALLOW, ZH_PROVIDER_CONTEXT } from "./lib/rules.mjs";
 
 
 
@@ -49,7 +50,9 @@ function meta(html, key, attr = "property") {
 }
 function ids(html) { return new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])); }
 
-const htmlFiles = readdirSync(ROOT).filter((f) => f.endsWith(".html")).sort();
+// English at the root; each translated edition in its folder (zh/, ar/).
+const htmlFiles = Object.values(EDITIONS).flatMap(({ folder }) =>
+  existsSync(join(ROOT, folder || ".")) ? readdirSync(join(ROOT, folder || ".")).filter((f) => f.endsWith(".html")).map((f) => folder + f) : []).sort();
 const pages = Object.fromEntries(htmlFiles.map((f) => [f, stripComments(read(f))]));
 
 // ---------- inventory ----------
@@ -81,7 +84,7 @@ for (const [file, html] of Object.entries(pages)) {
     for (const t of tags(html, tag)) {
       const ref = t[attr];
       if (ref === undefined || ref === "") continue;
-      if (tag === "link" && ["canonical"].includes(t.rel)) continue; // absolute by design, checked below
+      if (tag === "link" && ["canonical", "alternate"].includes(t.rel)) continue; // absolute by design, checked below
       const r = resolveRef(file, ref);
       if (!r) {
         if (/^javascript:/i.test(ref)) check(`${file}: no javascript: URLs`, false, ref);
@@ -133,7 +136,10 @@ for (const [file, html] of Object.entries(pages)) {
     check(`${file}: exactly one <h1>`, h1 === 1, `found ${h1}`);
   }
   for (const img of tags(html, "img")) check(`${file}: <img src="${img.src}"> has alt`, "alt" in img);
-  check(`${file}: html lang`, /<html\b[^>]*\blang="en"/.test(html));
+  const ed = EDITIONS[editionOf(file)];
+  const htmlTag = attrs((html.match(/<html\b([^>]*)>/) || [])[1] || "");
+  check(`${file}: html lang="${ed.lang}"`, htmlTag.lang === ed.lang, htmlTag.lang);
+  check(`${file}: html dir="${ed.dir}"`, htmlTag.dir === ed.dir, htmlTag.dir);
   check(`${file}: <title>`, /<title>[^<]+<\/title>/.test(html));
   for (const input of [...tags(html, "input"), ...tags(html, "textarea"), ...tags(html, "select")]) {
     if (input.type === "hidden") continue;
@@ -158,9 +164,11 @@ for (const file of [...STATUS_PAGES, ...STUBS]) {
   check(`${file}: noindex`, /noindex/i.test(meta(pages[file] || "", "robots", "name") || ""));
   check(`${file}: no og:url (not a real page)`, meta(pages[file] || "", "og:url") === undefined);
 }
-check("404.html: only root-relative internal URLs (served at any path)",
-  ![...tags(pages["404.html"], "a"), ...tags(pages["404.html"], "link"), ...tags(pages["404.html"], "script")]
-    .some((t) => { const v = t.href ?? t.src ?? ""; return v && !/^(\/|#|mailto:|data:|https?:)/.test(v); }));
+for (const nf of htmlFiles.filter((f) => f.endsWith("404.html"))) {
+  check(`${nf}: only root-relative internal URLs (served at any path)`,
+    ![...tags(pages[nf], "a"), ...tags(pages[nf], "link"), ...tags(pages[nf], "script")]
+      .some((t) => { const v = t.href ?? t.src ?? ""; return v && !/^(\/|#|mailto:|data:|https?:)/.test(v); }));
+}
 
 // ---------- sitemap + robots ----------
 {
@@ -263,9 +271,12 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
 // ---------- forms ⇔ function ----------
 {
   const fn = await import(pathToFileURL(join(ROOT, "functions/api/enquiry.js")).href);
-  const formPages = { "index.html": "private-enquiry", "partners.html": "partner-enquiry" };
-  for (const [file, type] of Object.entries(formPages)) {
+  const formPages = Object.values(EDITIONS).flatMap(({ folder }) => [[folder + "index.html", "private-enquiry"], [folder + "partners.html", "partner-enquiry"]]);
+  for (const [file, type] of formPages) {
     const html = pages[file];
+    // i18n: the hidden lang field names the edition (the function maps it to that edition's outcome pages)
+    const langField = tags(html, "input").find((t) => t.name === "lang");
+    check(`${file}: hidden lang=${editionOf(file)}`, !!langField && langField.type === "hidden" && langField.value === editionOf(file) && Object.hasOwn(fn.LANGS, langField.value), langField && langField.value);
     const formTag = tags(html, "form")[0] || {};
     check(`${file}: form action=/api/enquiry`, formTag.action === "/api/enquiry");
     check(`${file}: form data-endpoint=/api/enquiry`, formTag["data-endpoint"] === "/api/enquiry");
@@ -292,7 +303,7 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
     const consent = named("consent");
     check(`${file}: consent checkbox required, value=yes`, consent && consent.type === "checkbox" && "required" in consent && consent.value === "yes");
     const extraFields = [...tags(html, "input"), ...tags(html, "textarea")].map((t) => t.name).filter(Boolean)
-      .filter((n) => !["form", "consent", fn.HONEYPOT_FIELD, ...spec.required, ...spec.optional].includes(n));
+      .filter((n) => !["form", "lang", "consent", fn.HONEYPOT_FIELD, ...spec.required, ...spec.optional].includes(n));
     check(`${file}: no fields the function would drop`, extraFields.length === 0, extraFields.join(", "));
     const hp = named(fn.HONEYPOT_FIELD);
     check(`${file}: honeypot "${fn.HONEYPOT_FIELD}" present`, !!hp);
@@ -306,11 +317,22 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
     }
   }
   // ruling R2: the no-JS outcome pages the function redirects to exist; the too-long page names the limit
-  for (const [k, loc] of Object.entries(fn.PAGES)) check(`function page ${k} → ${loc} exists`, existsSync(join(ROOT, loc.slice(1))));
+  for (const lang of Object.keys(fn.LANGS)) {
+    for (const [k, loc] of Object.entries(fn.pagesFor(lang))) {
+      check(`function page ${lang} ${k} → ${loc} exists`, existsSync(join(ROOT, loc.slice(1))));
+      check(`function page ${lang} ${k} → ${loc} is in the ${lang} edition`, editionOf(loc.slice(1)) === lang && STATUS_PAGES.includes(loc.slice(1)));
+    }
+  }
+  check("function LANGS = the site's editions", JSON.stringify(Object.keys(fn.LANGS)) === JSON.stringify(Object.keys(EDITIONS)));
   const limitText = `${fn.LIMITS.message.toLocaleString("en-US")} characters`;
   const tooLong = pages[(fn.PAGES.tooLong || "").slice(1)] || "";
   check(`too-long page says messages are limited to ${limitText}`, new RegExp(`Messages are limited to ${limitText}`).test(tooLong));
-  check("too-long page offers info@regenig.com", /<main[\s\S]*href="mailto:info@regenig\.com"[\s\S]*<\/main>/.test(tooLong));
+  for (const lang of Object.keys(fn.LANGS)) {
+    const page = pages[fn.pagesFor(lang).tooLong.slice(1)] || "";
+    const main = (page.match(/<main[\s\S]*<\/main>/) || [""])[0];
+    check(`${lang} too-long page names the limit (${fn.LIMITS.message.toLocaleString("en-US")}, Western digits)`, main.includes(fn.LIMITS.message.toLocaleString("en-US")));
+    check(`${lang} too-long page offers info@regenig.com`, /href="mailto:info@regenig\.com"/.test(main));
+  }
   const siteJs = read("assets/js/site.js");
   check("site.js: message counter reads data-maxchars", /textarea\[data-maxchars\]/.test(siteJs) && /getAttribute\("data-maxchars"\)/.test(siteJs));
   check("site.js: counter is announced politely", /setAttribute\("aria-live", "polite"\)/.test(siteJs));
@@ -370,6 +392,236 @@ for (const js of readdirSync(join(ROOT, "assets/js"))) {
   const files = ["README.md", "assets/team/README.md", ...readdirSync(join(ROOT, "docs")).map((f) => `docs/${f}`), ...htmlFiles];
   const stale = files.filter((f) => /\bchoo@regenig\.com\b|\(or choo@\)/i.test(read(f)));
   check("R3: no choo@regenig.com left in docs, README or pages (use youngmin@regenig.com)", stale.length === 0, stale.join(", "));
+}
+
+// ---------- i18n: zh-Hans + ar editions ----------
+{
+  const LEGAL = {
+    en: { treatment: "Treatment is provided solely by licensed physicians at our partner clinics.", notMedical: "We do not provide medical treatment or medical advice." },
+    zh: { treatment: "所有治疗均仅由合作诊所的持牌医师提供。", notMedical: "我们不提供医疗诊治，也不提供医疗建议。", englishOnly: "隐私政策与免责声明目前仅提供英文版。" },
+    ar: { treatment: "يقدّم العلاج حصراً أطباء مرخّصون في العيادات الشريكة لنا.", notMedical: "لا نقدّم علاجاً طبياً ولا مشورة طبية.", englishOnly: "سياسة الخصوصية وإخلاء المسؤولية متاحتان حالياً باللغة الإنجليزية فقط." },
+  };
+  const I18N_KEYS = ["required", "sending", "sent", "failed", "closed", "too-long", "too-long-plain", "left", "over", "unit"];
+  const PLACEHOLDERS = { "too-long": ["{limit}", "{over}"], "too-long-plain": ["{limit}"], left: ["{n}"], over: ["{n}", "{limit}"] };
+  const visibleText = (html) => {
+    // <wbr> marks a word boundary inside a zh heading, not a gap: drop it before the tags, or
+    // 顶<wbr>级 would read as "顶 级" and slip past the scan
+    const body = html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<wbr\s*\/?>/gi, "");
+    const attrText = [...body.matchAll(/\s(?:alt|aria-label|title|content|data-i18n-[a-z-]+)="([^"]*)"/g)].map((m) => decode(m[1]));
+    return [body.replace(/<[^>]+>/g, " "), ...attrText].join(" ");
+  };
+  const nonStub = htmlFiles.filter((f) => !STUBS.includes(f));
+
+  // the banned-term scanner is not vacuous
+  // …and sees through a zh heading's <wbr> word boundaries (review I2-1: pins the <wbr> strip above)
+  check("visibleText() drops <wbr> without a gap, so 顶<wbr>级 is still caught", bannedTermsIn(visibleText("<h1>顶<wbr>级</h1><p>最<wbr/>先进</p>"), "zh").join() === "最,顶级");
+  check("banned-term scan catches zh superlatives", bannedTermsIn("这是最好的诊所，顶级服务", "zh").length === 2);
+  check("banned-term scan catches ar superlatives (prefix, diacritics, alef forms)", ["نحن الأفضل", "والأفضل", "الأفضلُ", "الافضل", "عيادة رائدة", "نتائج مضمونة", "قبل وبعد"].every((x) => bannedTermsIn(x, "ar").length > 0));
+  check("banned-term scan leaves ordinary ar words alone", bannedTermsIn("أولى تخصّصاتنا، من أول حديث حتى المتابعة", "ar").length === 0);
+  // zh: the PRC ad-law absolutes and safety guarantees (review I1-3)
+  for (const x of ["首选", "极致", "尖端", "唯一", "独家", "首家", "国家级", "金牌", "王牌", "冠军", "No.1", "零风险", "无副作用", "绝对安全", "100%有效"]) {
+    check(`banned-term scan catches zh ${x}`, bannedTermsIn(`我们是${x}的服务`, "zh").length > 0);
+  }
+  // ar: the superlative by shape (review I1-2). The first two are the brief's own banned phrases
+  // ("Japan's finest licensed clinics", "most trusted gateway") as a translator would render them.
+  for (const x of ["أرقى العيادات المرخّصة في اليابان", "أكثر البوابات موثوقية", "أكثر البوابات ثقةً", "الأكثر موثوقية", "الأكثر تقدّماً",
+    "أكثر العيادات أماناً", "أمهر الأطباء", "أرفع المعايير", "أعلى المعايير", "أحدث العلاجات", "وأحدث العلاجات", "بأفضل الأطباء",
+    "أهم العيادات", "الأرقى", "للأرقى", "أحدث علاج", "عيادات عالمية المستوى", "رعاية عالمية المستوى"]) {
+    check(`banned-term scan catches ar superlative "${x}"`, bannedTermsIn(x, "ar").length > 0);
+  }
+  // …while the elative-shaped words the pages use for other meanings stay allowed
+  check("banned-term scan allows ar non-superlatives of the elative shape (الحد الأقصى، عدد الأحرف، أحد المنسّقين، أكثر من)",
+    bannedTermsIn("الحد الأقصى للرسائل 5,000 حرف، عدد الأحرف المتبقية؛ سيتواصل معكم أحد المنسّقين؛ أكثر من عيادة؛ من أجل المرضى", "ar").length === 0);
+  // ordinary words a native reviewer may need are not flagged (review I2-2); elative + indefinite noun is (I2-3)
+  for (const x of ["سنردّ عليكم خلال أيام العمل المقبلة", "خلال الأيام القليلة المقبلة", "وغيرها من الخدمات الأخرى", "الحد الأدنى من البيانات",
+    "خلال الأشهر الثلاثة الأولى", "نتابع معكم جميع الأمور العملية", "وفق الأصول المهنية", "أوجه التعاون مع العيادات", "يأتي أكثر المرضى من ماليزيا",
+    "الأجور والرسوم", "أيدي الأطباء", "في أقرب وقت ممكن", "اترك رسالة"]) {
+    check(`banned-term scan allows ordinary ar "${x}"`, bannedTermsIn(x, "ar").length === 0, bannedTermsIn(x, "ar").join(", "));
+  }
+  for (const x of ["أوسع شبكة عيادات في اليابان", "أكبر شبكة من العيادات", "أبرز عيادة في طوكيو", "أسرع وصول إلى العلاج", "أكبر مجموعة طبية",
+    "أجمل تجربة", "العيادة الأشهر", "أشهر العيادات", "خدمة لا تُضاهى"]) {
+    check(`banned-term scan catches ar superlative "${x}"`, bannedTermsIn(x, "ar").length > 0);
+  }
+  for (const x of ["留言最多5,000字", "我们会在最近两个工作日内回复", "最终治疗方案由医师决定", "第一步：初次沟通", "我们保证您的信息保密"]) {
+    check(`banned-term scan allows ordinary zh "${x}"`, bannedTermsIn(x, "zh").length === 0, bannedTermsIn(x, "zh").join(", "));
+  }
+  for (const x of ["选择最多的诊所", "最先进的疗法", "第一家诊所", "保证疗效"]) check(`banned-term scan catches zh "${x}"`, bannedTermsIn(x, "zh").length > 0);
+  check("zh banned-term and provider allow-lists: every entry says what it means", [...Object.values(ZH_BANNED_ALLOW), ...Object.values(ZH_PROVIDER_CONTEXT)].every((v) => typeof v === "string" && v.length > 2));
+  check("ar elative allow-list: every entry says what the word means", Object.values(AR_ELATIVE_ALLOW).every((v) => typeof v === "string" && v.length > 2));
+  // RIG is an agency, never a medical provider (review I1-1)
+  for (const [x, ed] of [["一家私人医疗服务机构", "zh"], ["我们是医疗机构", "zh"], ["一家诊疗机构", "zh"], ["医疗服务提供者", "zh"],
+    ["一家持牌医疗机构", "zh"], ["Regenesis 是日本的持牌医疗机构", "zh"], ["作为持牌医疗机构", "zh"],
+    ["نحن مؤسسة طبية خاصة", "ar"], ["مقدّم رعاية صحية", "ar"], ["منشأة صحية خاصة", "ar"], ["مقدم الخدمات الطبية", "ar"]]) {
+    check(`provider-term scan catches ${ed} "${x}"`, providerTermsIn(x, ed).length > 0);
+  }
+  for (const x of ["面向医院、诊所等医疗机构", "日本的持牌医疗机构", "我们与日本医疗机构合作", "合作伙伴医疗机构"]) {
+    check(`provider-term scan allows third-party zh "${x}"`, providerTermsIn(x, "zh").length === 0);
+  }
+  check("provider-term scan allows partner clinics (合作医疗机构 / مؤسسة طبية شريكة) and RIG's own terms",
+    providerTermsIn("我们的合作医疗机构；一家私人医疗协调机构", "zh").length === 0 && providerTermsIn("مؤسسة طبية شريكة؛ وكالة رعاية صحية خاصة؛ المؤسسة", "ar").length === 0);
+
+  for (const file of nonStub) {
+    const ed = editionOf(file);
+    const raw = read(file);
+    const html = pages[file];
+    const legal = LEGAL[ed];
+    // compliance lines on every page, in its language
+    const treat = tags(html, "p").length && (html.match(/<p class="treatment">([^<]*)<\/p>/) || [])[1];
+    check(`${file}: footer treatment line (${ed})`, treat === legal.treatment, treat);
+    check(`${file}: "we do not provide medical treatment or advice" (${ed})`, html.includes(legal.notMedical));
+    if (ed === "en") continue;
+    check(`${file}: TRANSLATION comment at the top`, raw.split("\n").slice(0, 3).some((l) => l.trim() === "<!-- TRANSLATION: AI draft (2026-11), pending native review -->"));
+    check(`${file}: legal text noted as English-only`, html.includes(legal.englishOnly));
+    // legal pages are not translated: links go to the English files and say so with hreflang="en"
+    for (const a of tags(html, "a").filter((t) => /(^|\/)(privacy|disclaimer)\.html$/.test(t.href || ""))) {
+      const r = resolveRef(file, a.href);
+      check(`${file}: ${a.href} → English legal page`, r && ["privacy.html", "disclaimer.html"].includes(r.file) && a.hreflang === "en", a.href);
+    }
+    const consentLabel = (html.match(/<label for="p[ef]-consent">([\s\S]*?)<\/label>/) || [])[1];
+    if (consentLabel !== undefined) check(`${file}: consent label links the English Privacy Policy`, /href="(\.\.\/|\/)privacy\.html" hreflang="en"/.test(consentLabel));
+    // content rules in the page's language
+    const hits = bannedTermsIn(visibleText(html), ed);
+    check(`${file}: no banned terms (${ed}: ${BANNED_TERMS[ed].length} terms)`, hits.length === 0, hits.join(", "));
+    const prov = providerTermsIn(visibleText(html), ed);
+    check(`${file}: RIG not described as a medical provider (${ed})`, prov.length === 0, prov.join(", "));
+    // ar: free-text fields take dir="auto", so a Latin or Chinese entry keeps its own direction
+    if (ed === "ar") {
+      const free = [...tags(html, "input").filter((t) => !t.type && t.name !== "website"), ...tags(html, "textarea")];
+      for (const f of free) check(`${file}: #${f.id} has dir="auto"`, f.dir === "auto", f.dir);
+    }
+    // zh: display headings carry <wbr> word boundaries (CSS keep-all breaks only there)
+    if (ed === "zh") {
+      for (const m of raw.matchAll(/<(h[12])\b[^>]*>([\s\S]*?)<\/\1>/g)) {
+        const han = (m[2].replace(/<[^>]+>/g, "").match(/[\u4e00-\u9fff]/g) || []).length;
+        if (han > 4) check(`${file}: zh ${m[1]} has <wbr> word boundaries`, /<wbr>/.test(m[2]), m[2]);
+      }
+    }
+    check(`${file}: Western digits only (no Arabic-Indic numerals)`, !/[\u0660-\u0669\u06F0-\u06F9]/.test(visibleText(html)));
+    // localised form text
+    for (const form of tags(html, "form")) {
+      for (const k of I18N_KEYS) {
+        const v = form[`data-i18n-${k}`];
+        check(`${file}: form data-i18n-${k} present`, typeof v === "string" && v.trim() !== "");
+        for (const ph of PLACEHOLDERS[k] || []) check(`${file}: data-i18n-${k} has ${ph}`, typeof v === "string" && v.includes(ph));
+        check(`${file}: data-i18n-${k} is translated (no English sentence)`, typeof v === "string" && !/\b(the|your|please|characters?|message)\b/i.test(v), v);
+      }
+    }
+  }
+  for (const file of formPages(htmlFiles).filter((f) => editionOf(f) === "en")) {
+    check(`${file}: English form uses site.js defaults (no data-i18n-*)`, !tags(pages[file], "form").some((f) => Object.keys(f).some((k) => k.startsWith("data-i18n-"))));
+  }
+  function formPages(files) { return files.filter((f) => /(^|\/)(index|partners)\.html$/.test(f)); }
+
+  // fidelity to the softened English (Choo, 11/24): the RM paragraph says "provided under Japan's
+  // regenerative medicine regulations" (no "strict"); the first Our Story paragraph says Japan "has
+  // been known for" precision, care and medical discipline and calls its medicine "specialist"
+  // (no "most advanced", no "set the world's standard"). Compared without Arabic diacritics.
+  const FIDELITY = {
+    "zh/index.html": { must: ["依照日本再生医疗相关法规提供"], never: ["严格", "严苛", "监管体系约束"] },
+    "ar/index.html": { must: ["وفق أنظمة الطب التجديدي في اليابان"], never: ["الصارمة", "صارمة", "الرقابة التنظيمية"] },
+    // "medical discipline", not "standards" (review I2-4): 规范 brought the softened "world's standard" back
+    "zh/about.html": { must: ["以精准、细致与医疗上的严谨而著称", "日本的专科医疗"], never: ["先进医疗", "高标准", "世界标准", "世界的标准", "规范"] },
+    // "healthcare coordinators" are people (review I1-4), as in ar منسّقي الرعاية الصحية
+    "zh/partners.html": { must: ["医疗协调员"], never: ["医疗协调机构"] },
+    "ar/partners.html": { must: ["منسقي الرعاية الصحية"], never: [] },
+    "ar/about.html": { must: ["عرفت اليابان بالدقة والعناية والانضباط الطبي", "طبها التخصصي"], never: ["طبها المتقدم", "معايير رفيعة", "المعيار العالمي"] },
+  };
+  // RIG's own term (parent decision, c2: zh 私人医疗协调机构) in the home description, og:description and lede
+  for (const ed of ["zh", "ar"]) {
+    const html = pages[`${ed}/index.html`] || "";
+    const meta = (re) => decode((html.match(re) || [])[1] || "");
+    const places = { description: meta(/<meta name="description" content="([^"]*)"/), "og:description": meta(/<meta property="og:description" content="([^"]*)"/), lede: meta(/<p class="lede">([^<]*)<\/p>/) };
+    for (const [where, v] of Object.entries(places)) check(`${ed}/index.html: ${where} calls RIG ${RIG_TERMS[ed]}`, v.includes(RIG_TERMS[ed]), v);
+  }
+  check("zh/index.html: the old RIG term 中介 is gone", !visibleText(pages["zh/index.html"] || "").includes("中介"));
+  // every softened English line keeps its COPY marker in each translation (review I2-5)
+  for (const page of TRANSLATED) {
+    const n = (f) => (read(f).match(/<!-- COPY:/g) || []).length;
+    for (const ed of ["zh", "ar"]) check(`${ed}/${page}: COPY markers match the English (${n(page)})`, n(`${ed}/${page}`) === n(page), String(n(`${ed}/${page}`)));
+  }
+  const unmark = (s) => s.replace(/[\u064B-\u065F\u0670\u0640]/g, "");
+  for (const [file, { must, never }] of Object.entries(FIDELITY)) {
+    const text = unmark(visibleText(pages[file] || ""));
+    for (const m of must) check(`${file}: follows the softened English ("${m}")`, text.includes(unmark(m)));
+    for (const n of never) check(`${file}: no stronger claim than the English ("${n}")`, !text.includes(unmark(n)));
+  }
+
+  // language switcher: real links, one per edition, aria-current on the page's own language
+  const SAME = new Set([...TRANSLATED, ...STATUS_NAMES.filter((n) => n !== "404.html")]);
+  for (const file of nonStub) {
+    const ed = editionOf(file);
+    const li = (pages[file].match(/<li class="lang"[^>]*>([\s\S]*?)<\/li>/) || [])[1];
+    if (!check(`${file}: language switcher present`, !!li)) continue;
+    check(`${file}: switcher has no "coming soon" placeholders`, !/pending|Coming soon/i.test(li));
+    const links = tags(li, "a");
+    check(`${file}: switcher = EN | 中文 | العربية links`, JSON.stringify(links.map((a) => a.hreflang)) === JSON.stringify(Object.values(EDITIONS).map((e) => e.lang)), links.map((a) => a.hreflang).join(","));
+    const current = links.filter((a) => a["aria-current"] === "true");
+    check(`${file}: aria-current on the active language only`, current.length === 1 && current[0].hreflang === EDITIONS[ed].lang, current.map((a) => a.hreflang).join(","));
+    for (const [code, e] of Object.entries(EDITIONS)) {
+      const a = links.find((x) => x.hreflang === e.lang);
+      if (!a) continue;
+      check(`${file}: switcher ${code} link has lang="${e.lang}"`, a.lang === e.lang);
+      const r = resolveRef(file, a.href);
+      const base = file.split("/").pop();
+      // 404s point every language at its home; English-only pages (legal) at the other editions' home
+      const want = base === "404.html" ? e.folder + "index.html" : code === ed ? file : e.folder + (SAME.has(base) ? base : "index.html");
+      check(`${file}: switcher ${code} → ${want}`, r && !r.external && r.file === want, r && r.file);
+    }
+  }
+
+  // hreflang alternates: complete, self-referencing, reciprocal, x-default = English
+  const alts = (file) => Object.fromEntries(tags(pages[file] || "", "link").filter((t) => t.rel === "alternate").map((t) => [t.hreflang, t.href]));
+  const urlToFile = Object.fromEntries(Object.entries(REAL_PAGES).map(([f, u]) => [u, f]));
+  for (const page of TRANSLATED) {
+    for (const [code, e] of Object.entries(EDITIONS)) {
+      const file = e.folder + page;
+      const a = alts(file);
+      const want = Object.fromEntries([...Object.values(EDITIONS).map((x) => [x.lang, REAL_PAGES[x.folder + page]]), ["x-default", REAL_PAGES[page]]]);
+      check(`${file}: hreflang alternates en/zh-Hans/ar/x-default`, JSON.stringify(a) === JSON.stringify(want), JSON.stringify(a));
+      check(`${file}: canonical is its own hreflang URL`, tags(pages[file], "link").find((t) => t.rel === "canonical")?.href === a[e.lang]);
+      for (const [hl, url] of Object.entries(a)) {
+        const target = urlToFile[url];
+        check(`${file}: hreflang ${hl} → a real page`, !!target, url);
+        if (target) check(`${file}: hreflang ${hl} is reciprocal (${target} lists ${file})`, JSON.stringify(alts(target)) === JSON.stringify(a));
+      }
+    }
+  }
+  for (const file of htmlFiles.filter((f) => !TRANSLATED.includes(f.replace(/^(zh|ar)\//, "")))) {
+    check(`${file}: no hreflang alternates (English-only or noindex page)`, Object.keys(alts(file)).length === 0);
+  }
+
+  // sitemap: every edition's URL with its xhtml:link alternates
+  {
+    const xml = read("sitemap.xml");
+    check("sitemap.xml: xhtml namespace for alternates", xml.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"'));
+    const blocks = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => m[1]);
+    for (const b of blocks) {
+      const loc = (b.match(/<loc>([^<]+)<\/loc>/) || [])[1];
+      const file = urlToFile[loc];
+      const links = Object.fromEntries([...b.matchAll(/<xhtml:link rel="alternate" hreflang="([^"]+)" href="([^"]+)"\s*\/>/g)].map((m) => [m[1], m[2]]));
+      check(`sitemap.xml: ${loc} alternates = the page's hreflang links`, !!file && JSON.stringify(links) === JSON.stringify(alts(file)), JSON.stringify(links));
+    }
+  }
+
+  // fonts: one small self-hosted Arabic face (OFL), Chinese on system fonts only
+  {
+    const AR_FONT = "assets/fonts/noto-naskh-arabic-variable.woff2";
+    const size = existsSync(join(ROOT, AR_FONT)) ? statSync(join(ROOT, AR_FONT)).size : 0;
+    check(`Arabic font ${AR_FONT} present and ≤ 150 KB`, size > 10000 && size <= 150 * 1024, `${size} bytes`);
+    check("Arabic font licence (OFL) shipped beside it", existsSync(join(ROOT, "assets/fonts/OFL-NotoNaskhArabic.txt")) && /SIL Open Font License/.test(read("assets/fonts/OFL-NotoNaskhArabic.txt")));
+    const fontsCss = read("assets/css/fonts.css");
+    const face = (fontsCss.match(/@font-face\s*\{[^}]*Noto Naskh Arabic[^}]*\}/) || [""])[0];
+    check("fonts.css: Noto Naskh Arabic @font-face → the local file", face.includes("../fonts/noto-naskh-arabic-variable.woff2"));
+    check("fonts.css: Arabic face is Arabic-only (unicode-range starts at U+0600, no Latin)", /unicode-range:\s*U\+0600/.test(face) && !/U\+0000/.test(face));
+    check("no CJK font shipped (system fonts only)", !/U\+4E00|U\+3000|CJK|Han|Hei|Song/i.test(fontsCss.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+      readdirSync(join(ROOT, "assets/fonts")).filter((f) => /\.(woff2?|ttf|otf)$/.test(f)).length === 4);
+    const css = read("assets/css/style.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const arBlock = (css.match(/html:lang\(ar\)\s*\{[^}]*\}/) || [""])[0];
+    check("style.css: Arabic face named only in the html:lang(ar) stacks (EN/zh never download it)", arBlock.includes("Noto Naskh Arabic") && css.split("Noto Naskh Arabic").length - 1 === arBlock.split("Noto Naskh Arabic").length - 1);
+    const zhBlock = (css.match(/html:lang\(zh\)\s*\{[^}]*\}/) || [""])[0];
+    check("style.css: zh system CJK stack", ["PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"].every((f) => zhBlock.includes(f)));
+    check("style.css: no letter-spacing on Arabic labels", /html:lang\(ar\)\s*:is\([^)]*\.eyebrow[^)]*\)\s*\{[^}]*letter-spacing:\s*0;/.test(css));
+  }
 }
 
 // ---------- report ----------

@@ -527,7 +527,17 @@ curl -sI https://regenig.com/contact.html | grep -iE '^(HTTP|location)'         
 
 # robots + sitemap
 curl -s https://regenig.com/robots.txt                                                             # Sitemap: https://regenig.com/sitemap.xml
-curl -s https://regenig.com/sitemap.xml | grep -c '<loc>'                                          # 5
+curl -s https://regenig.com/sitemap.xml | grep -c '<loc>'                                          # 11 (5 English + 3 zh + 3 ar)
+
+# zh / ar editions (only once the i18n branch is merged): pages, per-folder 404, outcome pages
+for p in /zh/ /zh/about /zh/partners /ar/ /ar/about /ar/partners; do curl -s -o /dev/null -w "%{http_code} $p\n" "https://regenig.com$p"; done   # 200 each
+curl -s -o /dev/null -w '%{http_code}\n' https://regenig.com/zh/no-such-page                        # 404
+curl -s https://regenig.com/zh/no-such-page | grep -c 'lang="zh-Hans"'                             # 1 (zh/404.html, not the English 404)
+curl -s https://regenig.com/ar/no-such-page | grep -c 'dir="rtl"'                                  # 1 (ar/404.html)
+curl -s -o /dev/null -w '%{http_code}\n' https://regenig.com/assets/fonts/noto-naskh-arabic-variable.woff2   # 200 (self-hosted Arabic font)
+# no-JS lang routing, sending nothing: a filled honeypot "succeeds" without mail; an unknown form is an error
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -X POST https://regenig.com/api/enquiry -H 'Origin: https://regenig.com' --data 'form=private-enquiry&lang=zh&website=x'   # 303 https://regenig.com/zh/thanks.html
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -X POST https://regenig.com/api/enquiry -H 'Origin: https://regenig.com' --data 'form=nope&lang=ar'                      # 303 https://regenig.com/ar/enquiry-error.html
 
 # long cache on images/fonts, one day on CSS/JS
 curl -sI https://regenig.com/assets/img/hero.jpg | grep -i '^cache-control'                        # max-age=31536000, immutable
@@ -553,6 +563,9 @@ for i in $(seq 1 20); do curl -s -o /dev/null -w '%{http_code}\n' -X POST https:
 Then by hand:
 - [ ] **Forms deliver to info@**: send one private and one partner enquiry on https://regenig.com/;
       both arrive in info@ with the `[Website] …` subjects; Reply goes to the enquirer.
+- [ ] **zh / ar editions** (after the i18n merge): the switcher on each page goes to the same page in
+      the other language; with JavaScript disabled, one real enquiry from https://regenig.com/zh/ lands on
+      `/zh/thanks.html` and the email at info@ carries `Language: zh`; the ar pages read right to left.
 - [ ] **No-JS path**: with JavaScript disabled in the browser, submitting a form lands on
       `/thanks.html` (or `/enquiry-error.html` on failure); a message over 5,000 characters lands on
       `/enquiry-too-long.html`, and with JavaScript on the count under the message stops the send.

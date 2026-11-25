@@ -82,7 +82,7 @@ English-only pages link to the other editions' home; `aria-current` marks the ac
 - **Imagery:** `scripts/gen_images.py` (local ComfyUI + Z-Image Turbo) holds the prompts; Japan, light, texture, calm — no labs, needles or clinical stock.
 
 ## Team photos
-Drop `luqman.jpg`, `choo.jpg`, `shiv.jpg`, `lucas.jpg`, `aya.jpg` (portrait 4:5, ≥ 800×1000) into `assets/team/`,
+Drop `luqman.jpg`, `choo.jpg`, `shiv.jpg`, `aya.jpg` (portrait 4:5, ≥ 800×1000) into `assets/team/`,
 then add the matching `<img>` in `about.html` (see `assets/team/README.md`). Tags are not pre-placed: a missing file
 would 404 on every visit, and inline `onerror` handlers are blocked by the CSP. Initial placeholders show until then.
 
@@ -109,7 +109,7 @@ Still open (owners):
 - [ ] Processor agreements (Cloudflare, Resend DPA) and both named in the Privacy Policy
 - [ ] Final Privacy Policy (draft v0.1 in place) + Disclaimer text (replace interim notice)
 - [ ] Registered company name + number in footer (`OPEN ITEM` comment)
-- [ ] Dr. Lucas full name + credentials; leadership photos + short bios
+- [ ] Leadership photos + short bios (Dr. Lucas removed from the site 2026-11-24: stays an advisor, not public)
 - [ ] Hero footage
 - [ ] regenig.com DNS → Cloudflare (DNSSEC off first) and website cutover (runbook 4a–4d), then post-launch checks (runbook 6)
 - [ ] Chinese (Simplified) + Arabic (RTL) editions: built on branch `i18n` (AI draft); native review + Choo's OK before merge
